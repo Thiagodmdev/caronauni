@@ -1,0 +1,7 @@
+# Configurações locais de ferramentas
+.claude/
+**/.claude/
+.vscode/
+
+# Arquivos temporários do Word
+~$*
