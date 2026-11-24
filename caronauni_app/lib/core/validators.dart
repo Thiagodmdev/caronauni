@@ -28,3 +28,28 @@ String? validatePassword(String? value) {
   }
   return null;
 }
+
+String? validateName(String? value) {
+  final name = (value ?? '').trim();
+  if (name.isEmpty) return 'Informe seu nome';
+  if (!name.contains(RegExp(r'\s'))) return 'Informe nome e sobrenome';
+  return null;
+}
+
+/// Aceita telefone fixo (10 dígitos) ou celular (11), com DDD.
+String? validatePhone(String? value) {
+  final digits = (value ?? '').replaceAll(RegExp(r'\D'), '');
+  if (digits.isEmpty) return 'Informe seu telefone';
+  final valid =
+      RegExp(r'^[1-9]{2}9\d{8}$').hasMatch(digits) ||
+      RegExp(r'^[1-9]{2}[2-5]\d{7}$').hasMatch(digits);
+  return valid ? null : 'Telefone inválido. Use DDD + número';
+}
+
+String? validateCourse(String? value) =>
+    (value ?? '').trim().isEmpty ? 'Informe seu curso ou setor' : null;
+
+String? validatePasswordConfirmation(String? value, String password) {
+  if ((value ?? '').isEmpty) return 'Confirme sua senha';
+  return value == password ? null : 'As senhas não são iguais';
+}

@@ -35,7 +35,7 @@ class _SearchView extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Olá, ${user?.name ?? ''}',
+              'Olá, ${user?.firstName ?? ''}',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),

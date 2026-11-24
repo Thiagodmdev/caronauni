@@ -18,9 +18,9 @@ flutter run            # no emulador ou celular conectado
 flutter run -d chrome  # no navegador
 ```
 
-Esta primeira versão usa dados de exemplo. Para entrar, use qualquer e-mail `@aluno.faculdade.edu.br` e uma senha com 6 ou mais caracteres.
+Esta primeira versão usa dados de exemplo. Crie uma conta com um e-mail `@aluno.faculdade.edu.br` (a confirmação é simulada e a conta some ao fechar o app) ou entre com `demo@aluno.faculdade.edu.br` e senha `carona123`.
 
-Telas prontas: login, busca de caronas e detalhes da carona com pedido de vaga.
+Telas prontas: login, cadastro, confirmação de e-mail, busca de caronas e detalhes da carona com pedido de vaga.
 
 ## Testes
 

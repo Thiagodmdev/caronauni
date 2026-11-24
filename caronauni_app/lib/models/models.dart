@@ -1,9 +1,35 @@
 class AppUser {
-  const AppUser({required this.id, required this.name, required this.email});
+  const AppUser({
+    required this.id,
+    required this.name,
+    required this.email,
+    this.phone = '',
+    this.course = '',
+  });
 
   final String id;
   final String name;
   final String email;
+  final String phone;
+  final String course;
+
+  String get firstName => name.split(RegExp(r'\s+')).first;
+}
+
+class SignUpData {
+  const SignUpData({
+    required this.name,
+    required this.email,
+    required this.phone,
+    required this.course,
+    required this.password,
+  });
+
+  final String name;
+  final String email;
+  final String phone;
+  final String course;
+  final String password;
 }
 
 class Review {

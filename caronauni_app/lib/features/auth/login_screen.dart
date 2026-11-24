@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/validators.dart';
+import '../../data/auth_repository.dart';
+import 'confirm_email_screen.dart';
 import 'session_controller.dart';
+import 'sign_up_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -24,12 +27,18 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     FocusScope.of(context).unfocus();
-    context.read<SessionController>().signIn(
-      email: _emailController.text,
+    final navigator = Navigator.of(context);
+    final email = _emailController.text.trim().toLowerCase();
+    final outcome = await context.read<SessionController>().signIn(
+      email: email,
       password: _passwordController.text,
+    );
+    if (outcome != SignInOutcome.emailNotConfirmed || !mounted) return;
+    navigator.push(
+      MaterialPageRoute<void>(builder: (_) => ConfirmEmailScreen(email: email)),
     );
   }
 
@@ -110,7 +119,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       textInputAction: TextInputAction.done,
                       autofillHints: const [AutofillHints.password],
                       validator: validatePassword,
-                      onFieldSubmitted: (_) => _submit(),
+                      onFieldSubmitted: (_) {
+                        if (!session.loading) _submit();
+                      },
                       decoration: InputDecoration(
                         labelText: 'Senha',
                         prefixIcon: const Icon(Icons.lock_outline),
@@ -156,14 +167,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 12),
                     OutlinedButton(
-                      onPressed: () => _showNextStage('O cadastro'),
+                      onPressed: session.loading
+                          ? null
+                          : () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const SignUpScreen(),
+                              ),
+                            ),
                       child: const Text('Criar conta'),
                     ),
                     const SizedBox(height: 24),
                     Text(
-                      'Versão de demonstração: entre com qualquer e-mail '
-                      '@aluno.faculdade.edu.br e senha de $minPasswordLength '
-                      'caracteres ou mais.',
+                      'Versão de demonstração: crie uma conta ou entre com '
+                      '${MockAuthRepository.demoEmail} e senha '
+                      '${MockAuthRepository.demoPassword}.',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,

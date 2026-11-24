@@ -27,6 +27,7 @@ class CaronaUniApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        Provider<AuthRepository>.value(value: authRepository),
         Provider<RideRepository>.value(value: rideRepository),
         ChangeNotifierProvider(create: (_) => SessionController(authRepository)),
       ],
