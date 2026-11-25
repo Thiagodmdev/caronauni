@@ -7,6 +7,7 @@ import '../auth/session_controller.dart';
 import '../../models/models.dart';
 import '../ride_detail/ride_detail_screen.dart';
 import '../shared/person_avatar.dart';
+import '../shared/rating_label.dart';
 import 'search_view_model.dart';
 
 class SearchScreen extends StatelessWidget {
@@ -142,12 +143,23 @@ class _Results extends StatelessWidget {
     if (viewModel.loading && viewModel.rides.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
+    if (viewModel.failed) {
+      return Center(
+        child: TextButton(
+          onPressed: viewModel.search,
+          child: const Text('Não foi possível carregar. Tentar de novo'),
+        ),
+      );
+    }
     if (viewModel.rides.isEmpty) return const _EmptyResults();
     return ListView.separated(
       padding: const EdgeInsets.all(16),
       itemCount: viewModel.rides.length,
       separatorBuilder: (_, _) => const SizedBox(height: 12),
-      itemBuilder: (context, index) => _RideCard(ride: viewModel.rides[index]),
+      itemBuilder: (context, index) {
+        final ride = viewModel.rides[index];
+        return _RideCard(key: ValueKey(ride.id), ride: ride);
+      },
     );
   }
 }
@@ -187,7 +199,7 @@ class _EmptyResults extends StatelessWidget {
 }
 
 class _RideCard extends StatelessWidget {
-  const _RideCard({required this.ride});
+  const _RideCard({super.key, required this.ride});
 
   final Ride ride;
 
@@ -271,12 +283,7 @@ class _RideCard extends StatelessWidget {
                       style: theme.textTheme.bodyMedium,
                     ),
                   ),
-                  Icon(Icons.star_rounded, size: 18, color: Colors.amber.shade700),
-                  const SizedBox(width: 2),
-                  Text(
-                    formatRating(ride.driver.rating),
-                    style: theme.textTheme.bodyMedium,
-                  ),
+                  RatingLabel(userId: ride.driver.id),
                   const SizedBox(width: 12),
                   Icon(
                     Icons.event_seat_outlined,

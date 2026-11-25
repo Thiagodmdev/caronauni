@@ -1,156 +1,233 @@
 import 'package:caronauni/app.dart';
 import 'package:caronauni/data/auth_repository.dart';
+import 'package:caronauni/data/demo_data.dart';
+import 'package:caronauni/data/document_store.dart';
 import 'package:caronauni/data/ride_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  final now = DateTime(2026, 11, 5, 10);
+
   Future<void> pumpApp(WidgetTester tester) async {
     tester.view.physicalSize = const Size(1080, 2400);
     tester.view.devicePixelRatio = 2.75;
     addTearDown(tester.view.reset);
+    final store = MemoryStore();
+    await seedDemo(store, now);
+    // Sem mapa, que buscaria imagens na rede durante o teste.
+    for (final doc in await store.query('rides')) {
+      await store.update('rides/${doc.id}', {'originPoint': null});
+    }
     await tester.pumpWidget(
       CaronaUniApp(
-        authRepository: MockAuthRepository(latency: Duration.zero),
-        rideRepository: MockRideRepository(
+        authRepository: MockAuthRepository(
+          store,
           latency: Duration.zero,
-          clock: () => DateTime(2026, 11, 5, 10),
+          clock: () => now,
         ),
+        rideRepository: RideRepository(store, clock: () => now),
       ),
     );
-  }
-
-  Future<void> signIn(WidgetTester tester) async {
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'E-mail institucional'),
-      MockAuthRepository.demoEmail,
-    );
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'Senha'),
-      MockAuthRepository.demoPassword,
-    );
-    await tester.tap(find.widgetWithText(FilledButton, 'Entrar'));
     await tester.pumpAndSettle();
   }
-
-  testWidgets('login recusa e-mail de fora da faculdade', (tester) async {
-    await pumpApp(tester);
-    await tester.enterText(
-      find.widgetWithText(TextFormField, 'E-mail institucional'),
-      'thiago@gmail.com',
-    );
-    await tester.enterText(find.widgetWithText(TextFormField, 'Senha'), '123456');
-    await tester.tap(find.widgetWithText(FilledButton, 'Entrar'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('Use seu e-mail da faculdade'), findsOneWidget);
-    expect(find.text('Para onde você vai?'), findsNothing);
-  });
-
-  testWidgets('fluxo de login, busca, detalhes e pedido de vaga', (tester) async {
-    await pumpApp(tester);
-    await signIn(tester);
-
-    expect(find.text('Olá, Conta'), findsOneWidget);
-    expect(find.text('Jardim América'), findsWidgets);
-    // Carona lotada dos dados de exemplo não aparece.
-    expect(find.text('Boa Vista'), findsNothing);
-
-    await tester.enterText(find.byType(TextField), 'centro');
-    await tester.pumpAndSettle();
-    expect(find.text('Jardim América'), findsNothing);
-    expect(find.text('Centro'), findsWidgets);
-
-    await tester.tap(find.text('Centro').first);
-    await tester.pumpAndSettle();
-    expect(find.text('Detalhes da carona'), findsOneWidget);
-    expect(find.text('Rafael Nogueira'), findsOneWidget);
-
-    await tester.tap(find.widgetWithText(FilledButton, 'Pedir vaga'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(TextButton, 'Pedir vaga'));
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Pedido enviado'), findsOneWidget);
-
-    // O pedido continua registrado ao sair e voltar para a carona.
-    await tester.tap(find.byType(BackButton));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Centro').first);
-    await tester.pumpAndSettle();
-    expect(find.textContaining('Pedido enviado'), findsOneWidget);
-
-    await tester.tap(find.widgetWithText(OutlinedButton, 'Cancelar pedido'));
-    await tester.pumpAndSettle();
-    expect(find.widgetWithText(FilledButton, 'Pedir vaga'), findsOneWidget);
-  });
-
-  testWidgets('sair volta para o login', (tester) async {
-    await pumpApp(tester);
-    await signIn(tester);
-    await tester.tap(find.byTooltip('Sair'));
-    await tester.pumpAndSettle();
-    expect(find.widgetWithText(FilledButton, 'Entrar'), findsOneWidget);
-  });
 
   Future<void> fill(WidgetTester tester, String label, String text) =>
       tester.enterText(find.widgetWithText(TextFormField, label), text);
 
-  Future<void> tapButton(WidgetTester tester, String label) async {
-    final button = find.text(label).last;
-    await tester.ensureVisible(button);
-    await tester.tap(button);
+  Future<void> tapText(WidgetTester tester, String label) async {
+    final target = find.text(label).last;
+    await tester.ensureVisible(target);
+    await tester.pumpAndSettle();
+    await tester.tap(target);
     await tester.pumpAndSettle();
   }
 
+  Future<void> signIn(
+    WidgetTester tester, [
+    String email = MockAuthRepository.demoEmail,
+    String password = MockAuthRepository.demoPassword,
+  ]) async {
+    await fill(tester, 'E-mail', email);
+    await fill(tester, 'Senha', password);
+    await tapText(tester, 'Entrar');
+  }
+
+  Future<void> signOut(WidgetTester tester) async {
+    await tapText(tester, 'Buscar');
+    await tester.tap(find.byTooltip('Sair'));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('login recusa e-mail inválido e senha errada', (tester) async {
+    await pumpApp(tester);
+    await signIn(tester, 'thiago');
+    expect(find.text('E-mail inválido'), findsOneWidget);
+    await signIn(tester, MockAuthRepository.demoEmail, 'errada1');
+    expect(find.text('E-mail ou senha incorretos.'), findsOneWidget);
+  });
+
+  testWidgets('pedido, aceitação e contato entre as duas contas', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await signIn(tester);
+    expect(find.text('Olá, Conta'), findsOneWidget);
+    // A carona lotada dos dados de exemplo não aparece.
+    expect(find.text('Boa Vista'), findsNothing);
+    await tester.enterText(find.byType(TextField), 'jardim');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Jardim América').first);
+    await tester.pumpAndSettle();
+    await tapText(tester, 'Pedir vaga');
+    await tester.tap(find.widgetWithText(TextButton, 'Pedir vaga'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Pedido enviado'), findsOneWidget);
+    expect(find.byTooltip('WhatsApp'), findsNothing);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    await signOut(tester);
+
+    await signIn(tester, MockAuthRepository.driverEmail);
+    await tapText(tester, 'Avisos');
+    expect(find.textContaining('pediu vaga'), findsOneWidget);
+    await tapText(tester, 'Caronas');
+    await tapText(tester, 'Aceitar');
+    expect(find.text('Pedido aceito.'), findsOneWidget);
+    expect(find.text('Pedidos recebidos'), findsNothing);
+    await signOut(tester);
+
+    await signIn(tester);
+    await tapText(tester, 'Caronas');
+    expect(find.textContaining('Confirmada com Marina'), findsWidgets);
+    await tester.tap(find.textContaining('Confirmada com Marina').first);
+    await tester.pumpAndSettle();
+    expect(find.text('(81) 90000-0002'), findsOneWidget);
+    expect(find.byTooltip('WhatsApp'), findsOneWidget);
+  });
+
+  testWidgets('avalia uma carona já feita', (tester) async {
+    await pumpApp(tester);
+    await signIn(tester);
+    await tapText(tester, 'Caronas');
+    await tapText(tester, 'Avaliar ou informar falta');
+    await tapText(tester, 'Enviar avaliação');
+    expect(find.text('Avaliação enviada.'), findsOneWidget);
+  });
+
+  testWidgets('oferecer exige veículo e depois mostra o formulário', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await signIn(tester);
+    await tapText(tester, 'Oferecer');
+    await tapText(tester, 'Cadastrar veículo');
+    await fill(tester, 'Modelo', 'Fiat Uno');
+    await fill(tester, 'Cor', 'Azul');
+    await fill(tester, 'Placa', 'abc');
+    await tapText(tester, 'Salvar veículo');
+    expect(find.textContaining('Placa inválida'), findsOneWidget);
+    await fill(tester, 'Placa', 'abc-1d23');
+    await tapText(tester, 'Salvar veículo');
+    expect(find.textContaining('CNH válida.'), findsOneWidget);
+    await tapText(tester, 'Declaro que tenho CNH válida');
+    await tapText(tester, 'Salvar veículo');
+    expect(find.text('Publicar carona'), findsOneWidget);
+    expect(find.textContaining('ABC1D23'), findsOneWidget);
+  });
+
+  testWidgets('admin modera denúncia; passageiro não vê a área', (
+    tester,
+  ) async {
+    await pumpApp(tester);
+    await signIn(tester);
+    await tapText(tester, 'Perfil');
+    expect(find.text('Administração'), findsNothing);
+    await signOut(tester);
+    await signIn(tester, MockAuthRepository.adminEmail);
+    await tapText(tester, 'Perfil');
+    await tapText(tester, 'Administração');
+    expect(find.text('Bruno Teixeira'), findsOneWidget);
+    await tapText(tester, 'Bloquear');
+    expect(find.text('Desbloquear'), findsOneWidget);
+  });
+
   Future<void> fillSignUp(WidgetTester tester, {required String email}) async {
     await fill(tester, 'Nome completo', 'Ana Souza');
-    await fill(tester, 'E-mail institucional', email);
+    await fill(tester, 'E-mail', email);
     await fill(tester, 'Telefone', '81987654321');
     await fill(tester, 'Curso ou setor', 'Direito');
+    await fill(tester, 'Matrícula', '12345678');
     await fill(tester, 'Senha', 'segredo1');
     await fill(tester, 'Confirmar senha', 'segredo1');
   }
 
-  testWidgets('cadastro, confirmação de e-mail e login', (tester) async {
-    const email = 'ana@aluno.faculdade.edu.br';
+  testWidgets('cadastro, confirmação de e-mail e aprovação', (tester) async {
+    const email = 'ana@gmail.com';
     await pumpApp(tester);
-    await tapButton(tester, 'Criar conta');
+    await tapText(tester, 'Criar conta');
     await fillSignUp(tester, email: email);
     expect(find.text('(81) 98765-4321'), findsOneWidget);
-    await tapButton(tester, 'Cadastrar');
+    await tapText(tester, 'Cadastrar');
     expect(find.text('Confira sua caixa de entrada'), findsOneWidget);
 
     // Sem confirmar, o login leva de volta para a confirmação.
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
-    await fill(tester, 'E-mail institucional', email);
-    await fill(tester, 'Senha', 'segredo1');
-    await tapButton(tester, 'Entrar');
+    await signIn(tester, email, 'segredo1');
     expect(find.text('Confira sua caixa de entrada'), findsOneWidget);
-
-    await tapButton(tester, 'Reenviar link');
+    await tapText(tester, 'Reenviar link');
     expect(find.text('Enviamos um novo link.'), findsOneWidget);
-    await tapButton(tester, 'Simular abertura do link');
-    await tapButton(tester, 'Ir para o login');
-    await tapButton(tester, 'Entrar');
+    await tapText(tester, 'Simular abertura do link');
+    await tapText(tester, 'Ir para o login');
+    await tapText(tester, 'Entrar');
+    expect(find.text('Matrícula em análise'), findsOneWidget);
+    await tapText(tester, 'Verificar aprovação');
+    expect(find.text('Sua matrícula ainda está em análise.'), findsOneWidget);
+    await tapText(tester, 'Sair');
+
+    Future<void> decide(String action) async {
+      await signIn(tester, MockAuthRepository.adminEmail);
+      await tapText(tester, 'Perfil');
+      await tapText(tester, 'Administração');
+      final card = find.ancestor(
+        of: find.text('Ana Souza'),
+        matching: find.byType(Card),
+      );
+      await tester.tap(
+        find.descendant(of: card, matching: find.text(action)),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Ana Souza'), findsNothing);
+      await tester.tap(find.byType(BackButton));
+      await tester.pumpAndSettle();
+      await signOut(tester);
+    }
+
+    // Recusada, a pessoa corrige e envia de novo.
+    await decide('Recusar');
+    await signIn(tester, email, 'segredo1');
+    expect(find.text('Matrícula não aprovada'), findsOneWidget);
+    await fill(tester, 'Matrícula', '87654321');
+    await tapText(tester, 'Enviar matrícula');
+    expect(find.text('Matrícula em análise'), findsOneWidget);
+    await tapText(tester, 'Sair');
+
+    await decide('Aprovar');
+    await signIn(tester, email, 'segredo1');
     expect(find.text('Olá, Ana'), findsOneWidget);
   });
 
-  testWidgets('cadastro mostra erros dos campos', (tester) async {
+  testWidgets('cadastro mostra erros e recusa e-mail já usado', (tester) async {
     await pumpApp(tester);
-    await tapButton(tester, 'Criar conta');
-    await fillSignUp(tester, email: 'ana@gmail.com');
+    await tapText(tester, 'Criar conta');
+    await fillSignUp(tester, email: 'ana');
     await fill(tester, 'Confirmar senha', 'outra123');
-    await tapButton(tester, 'Cadastrar');
-    expect(find.text('Use seu e-mail da faculdade'), findsOneWidget);
+    await tapText(tester, 'Cadastrar');
+    expect(find.text('E-mail inválido'), findsOneWidget);
     expect(find.text('As senhas não são iguais'), findsOneWidget);
-  });
-
-  testWidgets('cadastro recusa e-mail já usado', (tester) async {
-    await pumpApp(tester);
-    await tapButton(tester, 'Criar conta');
     await fillSignUp(tester, email: MockAuthRepository.demoEmail);
-    await tapButton(tester, 'Cadastrar');
+    await tapText(tester, 'Cadastrar');
     expect(find.text('Já existe uma conta com este e-mail.'), findsOneWidget);
   });
 }

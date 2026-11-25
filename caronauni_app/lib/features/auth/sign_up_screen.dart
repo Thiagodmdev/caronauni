@@ -33,13 +33,22 @@ class _SignUpFormState extends State<_SignUpForm> {
   final _email = TextEditingController();
   final _phone = TextEditingController();
   final _course = TextEditingController();
+  final _registration = TextEditingController();
   final _password = TextEditingController();
   final _confirmation = TextEditingController();
   bool _obscure = true;
 
   @override
   void dispose() {
-    for (final c in [_name, _email, _phone, _course, _password, _confirmation]) {
+    for (final c in [
+      _name,
+      _email,
+      _phone,
+      _course,
+      _registration,
+      _password,
+      _confirmation,
+    ]) {
       c.dispose();
     }
     super.dispose();
@@ -56,6 +65,7 @@ class _SignUpFormState extends State<_SignUpForm> {
         email: email,
         phone: _phone.text,
         course: _course.text,
+        registration: _registration.text,
         password: _password.text,
       ),
     );
@@ -99,10 +109,10 @@ class _SignUpFormState extends State<_SignUpForm> {
                   textInputAction: TextInputAction.next,
                   autocorrect: false,
                   autofillHints: const [AutofillHints.email],
-                  validator: validateInstitutionalEmail,
+                  validator: validateEmail,
                   decoration: const InputDecoration(
-                    labelText: 'E-mail institucional',
-                    hintText: 'nome@aluno.faculdade.edu.br',
+                    labelText: 'E-mail',
+                    hintText: 'nome@exemplo.com',
                     prefixIcon: Icon(Icons.mail_outline),
                   ),
                 ),
@@ -130,6 +140,18 @@ class _SignUpFormState extends State<_SignUpForm> {
                   decoration: const InputDecoration(
                     labelText: 'Curso ou setor',
                     prefixIcon: Icon(Icons.school_outlined),
+                  ),
+                ),
+                gap,
+                TextFormField(
+                  controller: _registration,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.next,
+                  validator: validateRegistration,
+                  decoration: const InputDecoration(
+                    labelText: 'Matrícula',
+                    helperText: 'Só a administração vê, para aprovar sua conta',
+                    prefixIcon: Icon(Icons.badge_outlined),
                   ),
                 ),
                 gap,

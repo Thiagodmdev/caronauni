@@ -24,6 +24,9 @@ class SearchViewModel extends ChangeNotifier {
   List<Ride> _rides = const [];
   List<Ride> get rides => _rides;
 
+  bool _failed = false;
+  bool get failed => _failed;
+
   bool _loading = true;
   bool get loading => _loading;
 
@@ -51,16 +54,23 @@ class SearchViewModel extends ChangeNotifier {
     final current = ++_lastSearch;
     _loading = true;
     notifyListeners();
-    final results = await _repository.search(
-      RideQuery(
-        destination: _destination,
-        day: _day,
-        minutesOfDay: _minutesOfDay,
-      ),
-    );
+    var results = const <Ride>[];
+    var failed = false;
+    try {
+      results = await _repository.search(
+        RideQuery(
+          destination: _destination,
+          day: _day,
+          minutesOfDay: _minutesOfDay,
+        ),
+      );
+    } catch (_) {
+      failed = true;
+    }
     // Só a busca mais recente pode atualizar a lista.
     if (_disposed || current != _lastSearch) return;
     _rides = results;
+    _failed = failed;
     _loading = false;
     notifyListeners();
   }

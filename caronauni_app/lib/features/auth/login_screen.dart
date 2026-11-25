@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../../core/validators.dart';
 import '../../data/auth_repository.dart';
+import '../shared/feedback.dart';
 import 'confirm_email_screen.dart';
 import 'session_controller.dart';
 import 'sign_up_screen.dart';
@@ -42,17 +43,25 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _showNextStage(String feature) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(content: Text('$feature chega na próxima etapa do projeto.')),
-      );
+  Future<void> _resetPassword() async {
+    if (validateEmail(_emailController.text) != null) {
+      showMessage(context, 'Preencha seu e-mail da faculdade primeiro.');
+      return;
+    }
+    final auth = context.read<AuthRepository>();
+    await runAction(
+      context,
+      () => auth.sendPasswordReset(_emailController.text.trim().toLowerCase()),
+      success: auth is SimulatedInbox
+          ? 'Demonstração: nenhum e-mail é enviado.'
+          : 'Se a conta existir, você vai receber um link por e-mail.',
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final session = context.watch<SessionController>();
+    final isDemo = context.read<AuthRepository>() is SimulatedInbox;
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
@@ -105,10 +114,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       textInputAction: TextInputAction.next,
                       autocorrect: false,
                       autofillHints: const [AutofillHints.email],
-                      validator: validateInstitutionalEmail,
+                      validator: validateEmail,
                       decoration: const InputDecoration(
-                        labelText: 'E-mail institucional',
-                        hintText: 'nome@aluno.faculdade.edu.br',
+                        labelText: 'E-mail',
+                        hintText: 'nome@exemplo.com',
                         prefixIcon: Icon(Icons.mail_outline),
                       ),
                     ),
@@ -143,8 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () =>
-                            _showNextStage('A recuperação de senha'),
+                        onPressed: _resetPassword,
                         child: const Text('Esqueci minha senha'),
                       ),
                     ),
@@ -176,16 +184,20 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                       child: const Text('Criar conta'),
                     ),
+                    if (isDemo) ...[
                     const SizedBox(height: 24),
                     Text(
                       'Versão de demonstração: crie uma conta ou entre com '
-                      '${MockAuthRepository.demoEmail} e senha '
+                      '${MockAuthRepository.demoEmail} (passageiro), '
+                      '${MockAuthRepository.driverEmail} (motorista) ou '
+                      '${MockAuthRepository.adminEmail}. Senha: '
                       '${MockAuthRepository.demoPassword}.',
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
                     ),
+                    ],
                   ],
                 ),
               ),

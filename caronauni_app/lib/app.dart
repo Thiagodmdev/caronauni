@@ -5,9 +5,10 @@ import 'package:provider/provider.dart';
 import 'core/theme.dart';
 import 'data/auth_repository.dart';
 import 'data/ride_repository.dart';
+import 'features/auth/approval_screen.dart';
 import 'features/auth/login_screen.dart';
 import 'features/auth/session_controller.dart';
-import 'features/search/search_screen.dart';
+import 'features/home/home_screen.dart';
 
 class CaronaUniApp extends StatelessWidget {
   const CaronaUniApp({
@@ -63,7 +64,19 @@ class _SessionGate extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = context.select<SessionController, Object?>((s) => s.user);
-    return user == null ? const LoginScreen() : const SearchScreen();
+    final restoring = context.select<SessionController, bool>(
+      (s) => s.restoring,
+    );
+    final userId = context.select<SessionController, String?>(
+      (s) => s.user?.id,
+    );
+    final isMember = context.select<SessionController, bool>(
+      (s) => s.user?.isMember ?? false,
+    );
+    if (restoring) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+    if (userId == null) return const LoginScreen();
+    return isMember ? const HomeScreen() : const ApprovalScreen();
   }
 }

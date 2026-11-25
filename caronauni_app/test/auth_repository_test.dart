@@ -1,15 +1,17 @@
 import 'package:caronauni/core/validators.dart';
 import 'package:caronauni/data/auth_repository.dart';
+import 'package:caronauni/data/document_store.dart';
 import 'package:caronauni/models/models.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const email = 'ana@aluno.faculdade.edu.br';
+  const email = 'ana@sempreuninassau.com.br';
   const data = SignUpData(
     name: 'Ana Souza',
     email: email,
     phone: '(81) 98765-4321',
     course: 'Direito',
+    registration: '12345678',
     password: 'segredo1',
   );
   late DateTime now;
@@ -17,7 +19,11 @@ void main() {
 
   setUp(() {
     now = DateTime(2026, 11, 24, 10);
-    repo = MockAuthRepository(latency: Duration.zero, clock: () => now);
+    repo = MockAuthRepository(
+      MemoryStore(),
+      latency: Duration.zero,
+      clock: () => now,
+    );
   });
 
   test('só entra com conta existente e senha certa', () async {
@@ -41,11 +47,13 @@ void main() {
     );
     await repo.openConfirmationLink(email);
     final user = await repo.signIn(
-      email: ' ANA@aluno.faculdade.edu.br ',
+      email: ' ANA@sempreuninassau.com.br ',
       password: 'segredo1',
     );
     expect(user.firstName, 'Ana');
     expect(user.course, 'Direito');
+    expect(user.approval, Approval.pending);
+    expect(user.isMember, isFalse);
   });
 
   test('link expira em 24h e pode ser reenviado (EX05)', () async {
@@ -66,9 +74,10 @@ void main() {
       repo.signUp(
         const SignUpData(
           name: 'Outra Pessoa',
-          email: 'ANA@aluno.faculdade.edu.br',
+          email: 'ANA@sempreuninassau.com.br',
           phone: '(81) 98765-4321',
           course: 'Direito',
+    registration: '12345678',
           password: 'segredo2',
         ),
       ),

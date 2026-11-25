@@ -2,27 +2,23 @@ import 'package:caronauni/core/validators.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  group('e-mail institucional (RN01)', () {
-    test('aceita os domínios da faculdade, sem diferenciar maiúsculas', () {
-      expect(validateInstitutionalEmail('ana@aluno.faculdade.edu.br'), isNull);
-      expect(validateInstitutionalEmail(' ANA@Faculdade.edu.br '), isNull);
-    });
-
-    test('recusa outros domínios com a mensagem do documento (EX04)', () {
-      expect(
-        validateInstitutionalEmail('ana@gmail.com'),
-        'Use seu e-mail da faculdade',
-      );
-      expect(
-        validateInstitutionalEmail('ana@faculdade.edu.br.golpe.com'),
-        'Use seu e-mail da faculdade',
-      );
+  group('e-mail', () {
+    test('aceita qualquer domínio', () {
+      expect(validateEmail('ana@gmail.com'), isNull);
+      expect(validateEmail(' ANA@SempreUninassau.com.br '), isNull);
     });
 
     test('recusa e-mail vazio ou malformado', () {
-      expect(validateInstitutionalEmail(''), isNotNull);
-      expect(validateInstitutionalEmail('ana'), 'E-mail inválido');
+      expect(validateEmail(''), isNotNull);
+      expect(validateEmail('ana'), 'E-mail inválido');
     });
+  });
+
+  test('matrícula só com números (RN01)', () {
+    expect(validateRegistration('12345678'), isNull);
+    expect(validateRegistration(''), isNotNull);
+    expect(validateRegistration('abc12345'), isNotNull);
+    expect(validateRegistration('123'), isNotNull);
   });
 
   test('senha precisa de pelo menos 6 caracteres', () {

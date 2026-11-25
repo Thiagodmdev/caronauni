@@ -18,9 +18,17 @@ flutter run            # no emulador ou celular conectado
 flutter run -d chrome  # no navegador
 ```
 
-Esta primeira versão usa dados de exemplo. Crie uma conta com um e-mail `@aluno.faculdade.edu.br` (a confirmação é simulada e a conta some ao fechar o app) ou entre com `demo@aluno.faculdade.edu.br` e senha `carona123`.
+O app usa Firebase (login e banco de dados). Para rodar sem Firebase, com dados de exemplo:
 
-Telas prontas: login, cadastro, confirmação de e-mail, busca de caronas e detalhes da carona com pedido de vaga.
+```bash
+flutter run -d chrome --dart-define=DEMO=true
+```
+
+Contas da demonstração, com senha `carona123`: `demo@sempreuninassau.com.br` (passageiro), `marina@sempreuninassau.com.br` (motorista) e `admin@sempreuninassau.com.br` (administração).
+
+O cadastro usa e-mail pessoal, confirmado por link, e a matrícula. Só depois de a administração aprovar a matrícula (Perfil > Administração) a pessoa usa as caronas.
+
+As regras de segurança do banco estão em `firestore.rules`. Para tornar alguém administrador, crie no console do Firebase o documento `admins/<uid da pessoa>`.
 
 ## Testes
 

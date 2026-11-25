@@ -1,23 +1,21 @@
-/// Domínios aceitos no cadastro e no login (RN01).
-/// Troque pelos domínios reais da faculdade.
-const List<String> institutionalDomains = [
-  'aluno.faculdade.edu.br',
-  'faculdade.edu.br',
-];
-
 const int minPasswordLength = 6;
 
 final RegExp _emailShape = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
 
-String? validateInstitutionalEmail(String? value) {
+String? validateEmail(String? value) {
   final email = (value ?? '').trim().toLowerCase();
   if (email.isEmpty) return 'Informe seu e-mail';
   if (!_emailShape.hasMatch(email)) return 'E-mail inválido';
-  final domain = email.substring(email.indexOf('@') + 1);
-  if (!institutionalDomains.contains(domain)) {
-    return 'Use seu e-mail da faculdade';
-  }
   return null;
+}
+
+/// A matrícula é conferida pela administração (RN01).
+String? validateRegistration(String? value) {
+  final registration = (value ?? '').trim();
+  if (registration.isEmpty) return 'Informe sua matrícula';
+  return RegExp(r'^\d{5,15}$').hasMatch(registration)
+      ? null
+      : 'Matrícula inválida. Use só números';
 }
 
 String? validatePassword(String? value) {

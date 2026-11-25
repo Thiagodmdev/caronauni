@@ -56,9 +56,10 @@ class _ConfirmEmailView extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 confirmed
-                    ? 'Sua conta está pronta. Entre com seu e-mail e senha.'
+                    ? 'Entre com seu e-mail e senha para acompanhar a '
+                          'aprovação da sua matrícula.'
                     : 'Use o link enviado para ${viewModel.email}. '
-                          'Ele vale por 24 horas.',
+                          'Depois, entre com sua senha.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: scheme.onSurfaceVariant,

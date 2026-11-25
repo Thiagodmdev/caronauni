@@ -5,3 +5,6 @@
 
 # Arquivos temporários do Word
 ~$*
+
+# APKs gerados localmente
+/apk/

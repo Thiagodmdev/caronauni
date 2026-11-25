@@ -1,0 +1,217 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function verified() {
+      return signedIn() && request.auth.token.email_verified;
+    }
+    function uid() { return request.auth.uid; }
+    function isAdmin() {
+      return verified() && exists(/databases/$(database)/documents/admins/$(uid()));
+    }
+    // E-mail confirmado e matrícula aprovada pela administração.
+    function member() {
+      return isAdmin() || (verified()
+        && get(/databases/$(database)/documents/approvals/$(uid())).data.status == 'approved');
+    }
+    function active() {
+      return member() && !exists(/databases/$(database)/documents/blocks/$(uid()));
+    }
+    function changes(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    match /users/{id} {
+      allow get: if member() || (signedIn() && uid() == id);
+      allow create, update: if signedIn() && uid() == id
+        && request.resource.data.keys().hasOnly(['name', 'course', 'vehicle'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 100;
+      allow delete: if signedIn() && uid() == id;
+
+      match /private/contact {
+        // Só a própria pessoa ou quem tem carona aceita com ela.
+        allow get: if signedIn() && (uid() == id
+          || exists(/databases/$(database)/documents/connections/$(id + '_' + uid())));
+        allow write: if signedIn() && uid() == id;
+      }
+    }
+
+    match /approvals/{id} {
+      function validRequest() {
+        return request.resource.data.keys().hasOnly(
+            ['name', 'course', 'registration', 'status', 'createdAt'])
+          && request.resource.data.status == 'pending'
+          && request.resource.data.name is string
+          && request.resource.data.name.size() <= 100
+          && request.resource.data.course is string
+          && request.resource.data.course.size() <= 100
+          && request.resource.data.registration is string
+          && request.resource.data.registration.matches('[0-9]{5,15}');
+      }
+      allow get: if signedIn() && (uid() == id || isAdmin());
+      allow list: if isAdmin();
+      allow create: if signedIn() && uid() == id && validRequest();
+      // Matrícula recusada pode ser corrigida e enviada de novo.
+      allow update: if signedIn() && uid() == id
+        && resource.data.status == 'refused' && validRequest();
+      allow update: if isAdmin() && changes(['status'])
+        && request.resource.data.status in ['approved', 'refused'];
+      allow delete: if signedIn() && uid() == id;
+    }
+
+    match /admins/{id} {
+      allow get: if signedIn() && uid() == id;
+      allow write: if false;
+    }
+
+    match /blocks/{id} {
+      allow get: if member() && (uid() == id || isAdmin());
+      allow list, create, update, delete: if isAdmin();
+    }
+
+    match /rides/{id} {
+      allow read: if member();
+      allow create: if active()
+        && request.resource.data.driverId == uid()
+        && request.resource.data.takenSeats == 0
+        && request.resource.data.cancelled == false
+        && request.resource.data.totalSeats >= 1
+        && request.resource.data.totalSeats <= 4
+        && request.resource.data.price >= 0
+        && request.resource.data.price <= 30
+        && request.resource.data.departure >= request.time.toMillis() + 3540000
+        && request.resource.data.departure <= request.time.toMillis() + 604860000;
+      // Quem dirige cancela.
+      allow update: if active() && resource.data.driverId == uid()
+        && changes(['cancelled'])
+        && request.resource.data.cancelled == true;
+      // Quem dirige aceita: ocupa uma vaga por pedido.
+      allow update: if active() && resource.data.driverId == uid()
+        && changes(['takenSeats'])
+        && resource.data.cancelled == false
+        && request.resource.data.takenSeats == resource.data.takenSeats + 1
+        && request.resource.data.takenSeats <= resource.data.totalSeats;
+      // Quem tinha vaga aceita cancela: libera a própria vaga.
+      allow update: if member()
+        && changes(['takenSeats'])
+        && request.resource.data.takenSeats == resource.data.takenSeats - 1
+        && get(/databases/$(database)/documents/requests/$(id + '_' + uid())).data.status == 'accepted'
+        && getAfter(/databases/$(database)/documents/requests/$(id + '_' + uid())).data.status == 'cancelled';
+    }
+
+    match /recurrences/{id} {
+      allow read: if member() && resource.data.driverId == uid();
+      allow create: if active() && request.resource.data.driverId == uid();
+      allow update: if member() && resource.data.driverId == uid() && changes(['active']);
+      allow delete: if member() && resource.data.driverId == uid();
+    }
+
+    match /requests/{id} {
+      allow read: if member()
+        && (resource.data.passengerId == uid() || resource.data.driverId == uid());
+      function newRequest() {
+        let ride = get(/databases/$(database)/documents/rides/$(request.resource.data.rideId)).data;
+        return id == request.resource.data.rideId + '_' + uid()
+          && request.resource.data.passengerId == uid()
+          && request.resource.data.status == 'pending'
+          && request.resource.data.driverId == ride.driverId
+          && request.resource.data.departure == ride.departure
+          && ride.driverId != uid()
+          && ride.cancelled == false
+          && ride.takenSeats < ride.totalSeats
+          && ride.departure > request.time.toMillis();
+      }
+      allow create: if active() && newRequest();
+      // Novo pedido depois de cancelado, recusado ou expirado.
+      allow update: if active() && resource.data.passengerId == uid()
+        && resource.data.status != 'accepted' && newRequest();
+      allow update: if member() && resource.data.passengerId == uid()
+        && changes(['status'])
+        && resource.data.status in ['pending', 'accepted']
+        && request.resource.data.status == 'cancelled';
+      allow update: if active() && resource.data.driverId == uid()
+        && changes(['status'])
+        && resource.data.status == 'pending'
+        && request.resource.data.status == 'accepted'
+        && getAfter(/databases/$(database)/documents/rides/$(resource.data.rideId)).data.takenSeats
+           == get(/databases/$(database)/documents/rides/$(resource.data.rideId)).data.takenSeats + 1;
+      allow update: if member() && resource.data.driverId == uid()
+        && changes(['status'])
+        && resource.data.status in ['pending', 'accepted']
+        && request.resource.data.status == 'refused';
+    }
+
+    match /connections/{id} {
+      allow read: if member()
+        && (resource.data.viewerId == uid() || resource.data.ownerId == uid());
+      allow create, update: if active()
+        && id == request.resource.data.ownerId + '_' + request.resource.data.viewerId
+        && acceptedPair(request.resource.data);
+      function acceptedPair(data) {
+        let req = getAfter(/databases/$(database)/documents/requests/$(data.requestId)).data;
+        return req.status == 'accepted' && req.driverId == uid()
+          && ((data.ownerId == req.driverId && data.viewerId == req.passengerId)
+            || (data.ownerId == req.passengerId && data.viewerId == req.driverId));
+      }
+    }
+
+    match /ratings/{id} {
+      allow read: if member();
+      allow create: if active() && request.resource.data.fromId == uid()
+        && id == request.resource.data.rideId + '_' + uid() + '_' + request.resource.data.toId
+        && request.resource.data.toId != uid()
+        && request.resource.data.stars in [1, 2, 3, 4, 5]
+        && request.resource.data.text.size() <= 500
+        && rodeTogether(request.resource.data.rideId, request.resource.data.toId);
+    }
+
+    // Uma das pessoas dirigiu e a outra teve o pedido aceito, e a carona saiu
+    // há no máximo 48h.
+    function rodeTogether(rideId, otherId) {
+      let ride = get(/databases/$(database)/documents/rides/$(rideId)).data;
+      return ride.cancelled == false
+        && request.time.toMillis() > ride.departure
+        && request.time.toMillis() < ride.departure + 172800000
+        && ((ride.driverId == uid()
+            && get(/databases/$(database)/documents/requests/$(rideId + '_' + otherId)).data.status == 'accepted')
+          || (ride.driverId == otherId
+            && get(/databases/$(database)/documents/requests/$(rideId + '_' + uid())).data.status == 'accepted'));
+    }
+
+    match /faults/{id} {
+      allow get: if member() && (resource == null || resource.data.userId == uid()
+        || resource.data.createdBy == uid() || isAdmin());
+      allow list: if member() && (resource.data.userId == uid() || isAdmin());
+      allow create: if member() && request.resource.data.createdBy == uid()
+        && request.resource.data.status == 'active'
+        && id == request.resource.data.rideId + '_' + request.resource.data.userId + '_' + uid()
+        && (request.resource.data.userId == uid()
+          || rodeTogether(request.resource.data.rideId, request.resource.data.userId));
+      allow update: if member() && resource.data.userId == uid()
+        && changes(['status'])
+        && resource.data.status == 'active'
+        && request.resource.data.status == 'contested';
+      allow update: if isAdmin() && changes(['status']);
+    }
+
+    match /reports/{id} {
+      allow read: if isAdmin();
+      allow create: if active() && request.resource.data.fromId == uid()
+        && request.resource.data.status == 'open'
+        && request.resource.data.reason.size() <= 1000;
+      allow update: if isAdmin() && changes(['status']);
+    }
+
+    match /notices/{id} {
+      allow read: if member() && resource.data.toId == uid();
+      allow create: if member() && request.resource.data.fromId == uid()
+        && request.resource.data.read == false
+        && request.resource.data.text.size() <= 300;
+      allow update: if member() && resource.data.toId == uid() && changes(['read']);
+    }
+  }
+}

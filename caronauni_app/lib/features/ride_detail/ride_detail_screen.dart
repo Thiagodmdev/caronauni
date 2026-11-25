@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/formatters.dart';
 import '../../data/ride_repository.dart';
 import '../../models/models.dart';
 import '../auth/session_controller.dart';
+import '../shared/feedback.dart';
 import '../shared/person_avatar.dart';
+import '../shared/rating_label.dart';
 import 'ride_detail_view_model.dart';
+import 'ride_map.dart';
 
 class RideDetailScreen extends StatelessWidget {
   const RideDetailScreen({super.key, required this.ride});
@@ -19,7 +23,7 @@ class RideDetailScreen extends StatelessWidget {
       create: (context) => RideDetailViewModel(
         repository: context.read<RideRepository>(),
         ride: ride,
-        userId: context.read<SessionController>().user?.id ?? '',
+        user: context.read<SessionController>().user!,
       ),
       child: const _RideDetailView(),
     );
@@ -29,26 +33,71 @@ class RideDetailScreen extends StatelessWidget {
 class _RideDetailView extends StatelessWidget {
   const _RideDetailView();
 
+  Future<void> _report(BuildContext context, Ride ride) async {
+    final repository = context.read<RideRepository>();
+    final user = context.read<SessionController>().user!;
+    final reason = await askText(
+      context,
+      title: 'Denunciar ${ride.driver.name}',
+      label: 'O que aconteceu?',
+      action: 'Enviar',
+    );
+    if (reason == null || !context.mounted) return;
+    await runAction(
+      context,
+      () => repository.report(
+        from: user,
+        toId: ride.driver.id,
+        toName: ride.driver.name,
+        reason: reason,
+      ),
+      success: 'Denúncia enviada para análise.',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final viewModel = context.watch<RideDetailViewModel>();
     final ride = viewModel.ride;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Detalhes da carona')),
+      appBar: AppBar(
+        title: const Text('Detalhes da carona'),
+        actions: [
+          if (!viewModel.isDriver)
+            IconButton(
+              tooltip: 'Denunciar',
+              onPressed: () => _report(context, ride),
+              icon: const Icon(Icons.flag_outlined),
+            ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           _RouteCard(ride: ride),
           const SizedBox(height: 12),
+          if (ride.originPoint != null && ride.destinationPoint != null) ...[
+            RideMap(
+              origin: ride.originPoint!,
+              destination: ride.destinationPoint!,
+            ),
+            const SizedBox(height: 12),
+          ],
+          if (viewModel.phone != null) ...[
+            _ContactCard(phone: viewModel.phone!),
+            const SizedBox(height: 12),
+          ],
           _DriverCard(driver: ride.driver),
           const SizedBox(height: 12),
           _VehicleCard(vehicle: ride.vehicle),
           const SizedBox(height: 12),
-          _ReviewsSection(reviews: ride.driver.reviews),
+          _ReviewsSection(reviews: viewModel.reputation?.reviews ?? const []),
         ],
       ),
-      bottomNavigationBar: _RequestBar(viewModel: viewModel),
+      bottomNavigationBar: viewModel.isDriver || ride.cancelled
+          ? null
+          : _RequestBar(viewModel: viewModel),
     );
   }
 }
@@ -248,33 +297,42 @@ class _DriverCard extends StatelessWidget {
                 ],
               ),
             ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.star_rounded,
-                      size: 20,
-                      color: Colors.amber.shade700,
-                    ),
-                    const SizedBox(width: 2),
-                    Text(
-                      formatRating(driver.rating),
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-                Text(
-                  '${driver.ratingCount} avaliações',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+            RatingLabel(userId: driver.id, showCount: true),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ContactCard extends StatelessWidget {
+  const _ContactCard({required this.phone});
+
+  final String phone;
+
+  @override
+  Widget build(BuildContext context) {
+    final digits = phone.replaceAll(RegExp(r'\D'), '');
+    return Card(
+      child: ListTile(
+        contentPadding: const EdgeInsets.only(left: 16, right: 4),
+        title: Text(phone),
+        subtitle: const Text('Combine o encontro'),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: 'Ligar',
+              onPressed: () => launchUrl(Uri.parse('tel:+55$digits')),
+              icon: const Icon(Icons.phone_outlined),
+            ),
+            IconButton(
+              tooltip: 'WhatsApp',
+              onPressed: () => launchUrl(
+                Uri.parse('https://wa.me/55$digits'),
+                mode: LaunchMode.externalApplication,
+              ),
+              icon: const Icon(Icons.chat_outlined),
             ),
           ],
         ),
@@ -410,7 +468,8 @@ class _RequestBar extends StatelessWidget {
               Text(error, style: TextStyle(color: scheme.error)),
               const SizedBox(height: 8),
             ],
-            if (viewModel.requested) ...[
+            if (viewModel.status == RequestStatus.pending ||
+                viewModel.status == RequestStatus.accepted) ...[
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -426,8 +485,11 @@ class _RequestBar extends StatelessWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Pedido enviado. Aguardando a resposta de quem dirige. '
-                        'O telefone aparece depois da aceitação.',
+                        viewModel.status == RequestStatus.accepted
+                            ? 'Vaga confirmada. Boa viagem!'
+                            : 'Pedido enviado. Aguardando a resposta de quem '
+                                  'dirige. O telefone aparece depois da '
+                                  'aceitação.',
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: scheme.onPrimaryContainer,
                         ),
@@ -439,9 +501,22 @@ class _RequestBar extends StatelessWidget {
               const SizedBox(height: 8),
               OutlinedButton(
                 onPressed: viewModel.busy ? null : viewModel.cancelRequest,
-                child: const Text('Cancelar pedido'),
+                child: Text(
+                  viewModel.status == RequestStatus.accepted
+                      ? 'Cancelar participação'
+                      : 'Cancelar pedido',
+                ),
               ),
-            ] else
+            ] else ...[
+              if (viewModel.status == RequestStatus.refused ||
+                  viewModel.status == RequestStatus.expired) ...[
+                Text(
+                  viewModel.status == RequestStatus.refused
+                      ? 'Seu pedido anterior foi recusado.'
+                      : 'Seu pedido anterior expirou.',
+                ),
+                const SizedBox(height: 8),
+              ],
               FilledButton.icon(
                 onPressed: viewModel.busy
                     ? null
@@ -449,6 +524,7 @@ class _RequestBar extends StatelessWidget {
                 icon: const Icon(Icons.front_hand_outlined),
                 label: const Text('Pedir vaga'),
               ),
+            ],
           ],
         ),
       ),
