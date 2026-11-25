@@ -137,8 +137,8 @@ class _OfferScreenState extends State<OfferScreen> {
     final repository = context.read<RideRepository>();
     final user = context.read<SessionController>().user!;
     final points = await Future.wait([
-      geocode('${_originDetail.text} ${_origin.text}, Recife'),
-      geocode('${_destinationDetail.text} ${_destination.text}, Recife'),
+      geocodePlace(_origin.text, _originDetail.text),
+      geocodePlace(_destination.text, _destinationDetail.text),
     ]);
     if (!mounted) return;
     final ok = await runAction(

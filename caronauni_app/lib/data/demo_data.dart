@@ -25,7 +25,7 @@ const _juliana = Driver(
 const _bruno = Driver(id: 'bruno', name: 'Bruno Teixeira', course: 'Direito');
 
 // Posições aproximadas, só para ilustrar o mapa.
-const _campusPoint = GeoPoint(-8.0553, -34.8982);
+const _campusPoint = GeoPoint(-5.0756, -42.7903);
 
 /// Caronas de exemplo, sempre no futuro em relação a [now].
 List<Ride> buildDemoRides(DateTime now) {
@@ -75,13 +75,13 @@ List<Ride> buildDemoRides(DateTime now) {
   return [
     ride('r1', _marina, _argo, soon(0), 'Jardim América', 'Praça das Flores',
         25, 3, 1, 8,
-        point: const GeoPoint(-8.0400, -34.9200)),
+        point: const GeoPoint(-5.0603, -42.8121)),
     ride('r2', _rafael, _onix, soon(30), 'Centro', 'Terminal Central', 20, 4, 1,
         6.5,
-        point: const GeoPoint(-8.0630, -34.8800)),
+        point: const GeoPoint(-5.0898, -42.8131)),
     ride('r3', _juliana, _hb20, soon(75), 'Vila Nova', 'Av. das Palmeiras', 35,
         2, 0, 10,
-        point: const GeoPoint(-8.0900, -34.9100)),
+        point: const GeoPoint(-5.1103, -42.8021)),
     // Carona lotada: não aparece na busca.
     ride('r4', _bruno, _polo, soon(90), 'Boa Vista', 'Shopping Boa Vista', 30,
         3, 3, 9),
@@ -90,15 +90,15 @@ List<Ride> buildDemoRides(DateTime now) {
         point: _campusPoint,
         origin: 'Boa Vista',
         originDetail: 'Shopping Boa Vista',
-        originPoint: const GeoPoint(-8.0600, -34.8900)),
+        originPoint: const GeoPoint(-5.0803, -42.7721)),
     ride('r6', _marina, _argo, onDay(1, 18, 0), 'Jardim América',
         'Praça das Flores', 25, 3, 0, 8,
-        point: const GeoPoint(-8.0400, -34.9200)),
+        point: const GeoPoint(-5.0603, -42.8121)),
     ride('r7', _juliana, _hb20, onDay(1, 18, 20), 'São Sebastião',
         'Rua das Acácias', 40, 3, 1, 12),
     ride('r8', _rafael, _onix, onDay(2, 12, 30), 'Centro', 'Terminal Central',
         20, 4, 0, 6.5,
-        point: const GeoPoint(-8.0630, -34.8800)),
+        point: const GeoPoint(-5.0898, -42.8131)),
   ];
 }
 
@@ -120,14 +120,14 @@ Future<void> seedDemo(DocumentStore store, DateTime now) async {
       name: 'Conta Demonstração',
       email: MockAuthRepository.demoEmail,
       course: 'Ciência da Computação',
-      phone: '(81) 90000-0001',
+      phone: '(86) 90000-0001',
     ),
     AppUser(
       id: 'marina',
       name: 'Marina Duarte',
       email: MockAuthRepository.driverEmail,
       course: 'Engenharia de Software',
-      phone: '(81) 90000-0002',
+      phone: '(86) 90000-0002',
       vehicle: _argo,
     ),
     AppUser(

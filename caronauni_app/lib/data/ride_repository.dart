@@ -796,7 +796,7 @@ class RideRepository {
           )
           ..add(
             _store.set('users/${driver.id}/private/contact', {
-              'phone': '(81) 90000-000${drivers.length}',
+              'phone': '(86) 90000-000${drivers.length}',
             }),
           );
       }

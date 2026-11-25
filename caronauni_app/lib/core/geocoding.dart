@@ -29,3 +29,21 @@ Future<GeoPoint?> geocode(String address) async {
     return null;
   }
 }
+
+/// Do mais específico ao mais geral: o ponto de encontro costuma ser um texto
+/// livre, que o mapa não conhece, e há caronas para cidades vizinhas.
+Future<GeoPoint?> geocodePlace(
+  String place,
+  String detail, {
+  Future<GeoPoint?> Function(String address) find = geocode,
+}) async {
+  for (final address in [
+    '$detail, $place, Teresina, Piauí',
+    '$place, Teresina, Piauí',
+    '$place, Piauí',
+  ]) {
+    final point = await find(address);
+    if (point != null) return point;
+  }
+  return null;
+}

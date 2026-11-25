@@ -114,7 +114,7 @@ void main() {
     expect(find.textContaining('Confirmada com Marina'), findsWidgets);
     await tester.tap(find.textContaining('Confirmada com Marina').first);
     await tester.pumpAndSettle();
-    expect(find.text('(81) 90000-0002'), findsOneWidget);
+    expect(find.text('(86) 90000-0002'), findsOneWidget);
     expect(find.byTooltip('WhatsApp'), findsOneWidget);
   });
 
@@ -140,7 +140,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Vaga confirmada'), findsOneWidget);
     await tapText(tester, 'Ver carona e contato');
-    expect(find.text('(81) 90000-0002'), findsOneWidget);
+    expect(find.text('(86) 90000-0002'), findsOneWidget);
   });
 
   testWidgets('avalia uma carona já feita', (tester) async {
