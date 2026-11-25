@@ -101,6 +101,16 @@ List<Ride> buildDemoRides(DateTime now) {
   ];
 }
 
+/// (id de quem recebeu, quem avaliou, estrelas, texto).
+const demoRatings = [
+  ('marina', 'Lucas', 5, 'Pontual e muito cuidadosa no trânsito.'),
+  ('marina', 'Bianca', 5, 'Avisou com antecedência onde me buscar.'),
+  ('rafael', 'Camila', 5, 'Carro limpo e viagem tranquila.'),
+  ('rafael', 'Pedro', 4, 'Saiu 5 minutos depois, mas avisou.'),
+  ('juliana', 'Tiago', 5, 'Super simpática e organizada.'),
+  ('bruno', 'Ana', 4, 'Boa carona, deixou perto de casa.'),
+];
+
 Future<void> seedDemo(DocumentStore store, DateTime now) async {
   final profiles = ProfileStore(store);
   const people = [
@@ -146,6 +156,12 @@ Future<void> seedDemo(DocumentStore store, DateTime now) async {
     });
   }
 
+  await store.set('licenses/marina', {
+    'name': 'Marina Duarte',
+    'photo': null,
+    'status': Approval.approved.name,
+    'createdAt': now.millisecondsSinceEpoch,
+  });
   for (final ride in buildDemoRides(now)) {
     await store.set('rides/${ride.id}', ride.toJson());
   }
@@ -166,15 +182,7 @@ Future<void> seedDemo(DocumentStore store, DateTime now) async {
     'departure': past.departure.millisecondsSinceEpoch,
   });
 
-  const ratings = [
-    ('marina', 'Lucas', 5, 'Pontual e muito cuidadosa no trânsito.'),
-    ('marina', 'Bianca', 5, 'Avisou com antecedência onde me buscar.'),
-    ('rafael', 'Camila', 5, 'Carro limpo e viagem tranquila.'),
-    ('rafael', 'Pedro', 4, 'Saiu 5 minutos depois, mas avisou.'),
-    ('juliana', 'Tiago', 5, 'Super simpática e organizada.'),
-    ('bruno', 'Ana', 4, 'Boa carona, deixou perto de casa.'),
-  ];
-  for (final (i, r) in ratings.indexed) {
+  for (final (i, r) in demoRatings.indexed) {
     await store.set('ratings/seed$i', {
       'rideId': 'seed',
       'fromId': 'seed$i',

@@ -1,10 +1,16 @@
+import 'dart:convert';
+
 import 'package:caronauni/app.dart';
 import 'package:caronauni/data/auth_repository.dart';
 import 'package:caronauni/data/demo_data.dart';
 import 'package:caronauni/data/document_store.dart';
 import 'package:caronauni/data/ride_repository.dart';
+import 'package:caronauni/features/profile/license_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+const _pixel =
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
 
 void main() {
   final now = DateTime(2026, 11, 5, 10);
@@ -132,8 +138,52 @@ void main() {
     expect(find.textContaining('CNH válida.'), findsOneWidget);
     await tapText(tester, 'Declaro que tenho CNH válida');
     await tapText(tester, 'Salvar veículo');
+    expect(find.textContaining('envie a foto da sua CNH'), findsOneWidget);
+    await tapText(tester, 'Enviar foto da CNH');
+    expect(find.text('Envie a foto da sua CNH'), findsOneWidget);
+    expect(find.text('Escolher imagem'), findsOneWidget);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    await signOut(tester);
+
+    // Quem já tem a CNH aprovada vê o formulário.
+    await signIn(tester, MockAuthRepository.driverEmail);
+    await tapText(tester, 'Oferecer');
     expect(find.text('Publicar carona'), findsOneWidget);
-    expect(find.textContaining('ABC1D23'), findsOneWidget);
+  });
+
+  testWidgets('envia CNH e o admin aprova pela foto', (tester) async {
+    await pumpApp(tester);
+    await signIn(tester);
+    final context = tester.element(find.byType(NavigationBar));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => LicenseScreen(
+          pickPhoto: (_) async => base64Decode(_pixel),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tapText(tester, 'Escolher imagem');
+    await tapText(tester, 'Enviar CNH');
+    expect(find.text('CNH em análise'), findsOneWidget);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    await signOut(tester);
+
+    await signIn(tester, MockAuthRepository.adminEmail);
+    await tapText(tester, 'Perfil');
+    await tapText(tester, 'Administração');
+    await tapText(tester, 'Aprovar CNH');
+    expect(find.text('Aprovar CNH'), findsNothing);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    await signOut(tester);
+
+    await signIn(tester);
+    await tapText(tester, 'Perfil');
+    await tapText(tester, 'Minha CNH');
+    expect(find.text('CNH aprovada'), findsOneWidget);
   });
 
   testWidgets('admin modera denúncia; passageiro não vê a área', (

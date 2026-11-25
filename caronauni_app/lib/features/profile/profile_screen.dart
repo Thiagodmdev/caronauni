@@ -15,6 +15,7 @@ import '../shared/feedback.dart';
 import '../shared/person_avatar.dart';
 import '../shared/rating_label.dart';
 import '../shared/reloadable.dart';
+import 'license_screen.dart';
 import 'vehicle_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
@@ -96,6 +97,11 @@ class ProfileScreen extends StatelessWidget {
                     : '${user.vehicle!.model} (${user.vehicle!.plate})',
               ),
               onTap: () => open(const VehicleScreen()),
+            ),
+            ListTile(
+              leading: const Icon(Icons.badge_outlined),
+              title: const Text('Minha CNH'),
+              onTap: () => open(const LicenseScreen()),
             ),
             if (user.isAdmin)
               ListTile(

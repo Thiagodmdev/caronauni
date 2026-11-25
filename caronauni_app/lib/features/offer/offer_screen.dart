@@ -6,6 +6,7 @@ import '../../core/geocoding.dart';
 import '../../data/ride_repository.dart';
 import '../../models/models.dart';
 import '../auth/session_controller.dart';
+import '../profile/license_screen.dart';
 import '../profile/vehicle_screen.dart';
 import '../shared/feedback.dart';
 
@@ -41,12 +42,30 @@ class _OfferScreenState extends State<OfferScreen> {
   bool _recurrent = false;
   final Set<int> _weekdays = {};
   bool _saving = false;
+  Approval? _license;
 
   @override
   void initState() {
     super.initState();
     final now = context.read<RideRepository>().now;
     _departure = DateTime(now.year, now.month, now.day, now.hour + 2);
+    _loadLicense();
+  }
+
+  Future<void> _loadLicense() async {
+    final repository = context.read<RideRepository>();
+    final userId = context.read<SessionController>().user!.id;
+    await runAction(context, () async {
+      final license = await repository.licenseStatus(userId);
+      if (mounted) setState(() => _license = license);
+    });
+  }
+
+  Future<void> _open(Widget screen) async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute<void>(builder: (_) => screen));
+    if (mounted) await _loadLicense();
   }
 
   @override
@@ -147,7 +166,42 @@ class _OfferScreenState extends State<OfferScreen> {
     final vehicle = context.watch<SessionController>().user?.vehicle;
     return Scaffold(
       appBar: AppBar(title: const Text('Oferecer carona')),
-      body: vehicle == null ? const _NeedsVehicle() : _form(context, vehicle),
+      body: vehicle == null
+          ? _Requirement(
+              icon: Icons.directions_car_outlined,
+              text: 'Para oferecer carona, cadastre seu veículo primeiro.',
+              action: 'Cadastrar veículo',
+              onPressed: () => _open(const VehicleScreen()),
+            )
+          : switch (_license) {
+              Approval.approved => _form(context, vehicle),
+              null => _Requirement(
+                icon: Icons.badge_outlined,
+                text: 'Verificando sua CNH...',
+                action: 'Tentar de novo',
+                onPressed: _loadLicense,
+              ),
+              Approval.pending => _Requirement(
+                icon: Icons.hourglass_top,
+                text:
+                    'Sua CNH está em análise. Você poderá oferecer caronas '
+                    'depois da aprovação.',
+                action: 'Verificar aprovação',
+                onPressed: _loadLicense,
+              ),
+              Approval.missing => _Requirement(
+                icon: Icons.badge_outlined,
+                text: 'Agora envie a foto da sua CNH para análise.',
+                action: 'Enviar foto da CNH',
+                onPressed: () => _open(const LicenseScreen()),
+              ),
+              Approval.refused => _Requirement(
+                icon: Icons.badge_outlined,
+                text: 'Sua CNH não foi aprovada. Envie outra foto.',
+                action: 'Enviar foto da CNH',
+                onPressed: () => _open(const LicenseScreen()),
+              ),
+            },
     );
   }
 
@@ -289,8 +343,18 @@ class _OfferScreenState extends State<OfferScreen> {
   }
 }
 
-class _NeedsVehicle extends StatelessWidget {
-  const _NeedsVehicle();
+class _Requirement extends StatelessWidget {
+  const _Requirement({
+    required this.icon,
+    required this.text,
+    required this.action,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String text;
+  final String action;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) => Padding(
@@ -298,19 +362,11 @@ class _NeedsVehicle extends StatelessWidget {
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        const Icon(Icons.directions_car_outlined, size: 56),
+        Icon(icon, size: 56),
         const SizedBox(height: 12),
-        const Text(
-          'Para oferecer carona, cadastre seu veículo primeiro.',
-          textAlign: TextAlign.center,
-        ),
+        Text(text, textAlign: TextAlign.center),
         const SizedBox(height: 16),
-        FilledButton(
-          onPressed: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const VehicleScreen()),
-          ),
-          child: const Text('Cadastrar veículo'),
-        ),
+        FilledButton(onPressed: onPressed, child: Text(action)),
       ],
     ),
   );

@@ -26,7 +26,7 @@ String formatRating(double value) =>
     value.toStringAsFixed(1).replaceAll('.', ',');
 
 String initialsOf(String name) {
-  final parts = name.trim().split(RegExp(r'\s+'));
+  final parts = name.replaceAll('(exemplo)', '').trim().split(RegExp(r'\s+'));
   final first = parts.first.isEmpty ? '' : parts.first[0];
   if (parts.length == 1) return first.toUpperCase();
   return '$first${parts.last[0]}'.toUpperCase();

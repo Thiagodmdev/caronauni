@@ -20,6 +20,14 @@ service cloud.firestore {
     function active() {
       return member() && !exists(/databases/$(database)/documents/blocks/$(uid()));
     }
+    // Motoristas fictícios, criados pela administração para apresentações.
+    function sample(id) {
+      return id.matches('exemplo_.*');
+    }
+    // CNH aprovada pela administração.
+    function licensed() {
+      return get(/databases/$(database)/documents/licenses/$(uid())).data.status == 'approved';
+    }
     function changes(fields) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
     }
@@ -31,12 +39,14 @@ service cloud.firestore {
         && request.resource.data.name is string
         && request.resource.data.name.size() <= 100;
       allow delete: if signedIn() && uid() == id;
+      allow create, update, delete: if sample(id) && isAdmin();
 
       match /private/contact {
         // Só a própria pessoa ou quem tem carona aceita com ela.
         allow get: if signedIn() && (uid() == id
           || exists(/databases/$(database)/documents/connections/$(id + '_' + uid())));
         allow write: if signedIn() && uid() == id;
+        allow write: if sample(id) && isAdmin();
       }
     }
 
@@ -63,6 +73,28 @@ service cloud.firestore {
       allow delete: if signedIn() && uid() == id;
     }
 
+    match /licenses/{id} {
+      function validLicense() {
+        return request.resource.data.keys().hasOnly(
+            ['name', 'photo', 'status', 'createdAt'])
+          && request.resource.data.status == 'pending'
+          && request.resource.data.name is string
+          && request.resource.data.name.size() <= 100
+          && request.resource.data.photo is string
+          && request.resource.data.photo.size() <= 850000;
+      }
+      allow get: if signedIn() && (uid() == id || isAdmin());
+      allow list: if isAdmin();
+      allow create: if active() && uid() == id && validLicense();
+      allow update: if active() && uid() == id
+        && resource.data.status == 'refused' && validLicense();
+      // A decisão apaga a foto.
+      allow update: if isAdmin() && changes(['status', 'photo'])
+        && request.resource.data.status in ['approved', 'refused']
+        && request.resource.data.photo == null;
+      allow delete: if signedIn() && uid() == id;
+    }
+
     match /admins/{id} {
       allow get: if signedIn() && uid() == id;
       allow write: if false;
@@ -75,7 +107,18 @@ service cloud.firestore {
 
     match /rides/{id} {
       allow read: if member();
-      allow create: if active()
+      allow create: if sample(id) && isAdmin()
+        && sample(request.resource.data.driverId);
+      allow delete: if sample(id) && isAdmin();
+      // Pedido a motorista de exemplo é aceito na hora por quem pediu.
+      allow update: if sample(id) && active()
+        && changes(['takenSeats'])
+        && resource.data.cancelled == false
+        && request.resource.data.takenSeats == resource.data.takenSeats + 1
+        && request.resource.data.takenSeats <= resource.data.totalSeats
+        && get(/databases/$(database)/documents/requests/$(id + '_' + uid())).data.status == 'pending'
+        && getAfter(/databases/$(database)/documents/requests/$(id + '_' + uid())).data.status == 'accepted';
+      allow create: if active() && licensed()
         && request.resource.data.driverId == uid()
         && request.resource.data.takenSeats == 0
         && request.resource.data.cancelled == false
@@ -105,7 +148,8 @@ service cloud.firestore {
 
     match /recurrences/{id} {
       allow read: if member() && resource.data.driverId == uid();
-      allow create: if active() && request.resource.data.driverId == uid();
+      allow create: if active() && licensed()
+        && request.resource.data.driverId == uid();
       allow update: if member() && resource.data.driverId == uid() && changes(['active']);
       allow delete: if member() && resource.data.driverId == uid();
     }
@@ -133,7 +177,9 @@ service cloud.firestore {
         && changes(['status'])
         && resource.data.status in ['pending', 'accepted']
         && request.resource.data.status == 'cancelled';
-      allow update: if active() && resource.data.driverId == uid()
+      allow update: if active()
+        && (resource.data.driverId == uid()
+          || (sample(resource.data.driverId) && resource.data.passengerId == uid()))
         && changes(['status'])
         && resource.data.status == 'pending'
         && request.resource.data.status == 'accepted'
@@ -153,7 +199,9 @@ service cloud.firestore {
         && acceptedPair(request.resource.data);
       function acceptedPair(data) {
         let req = getAfter(/databases/$(database)/documents/requests/$(data.requestId)).data;
-        return req.status == 'accepted' && req.driverId == uid()
+        return req.status == 'accepted'
+          && (req.driverId == uid()
+            || (sample(req.driverId) && req.passengerId == uid()))
           && ((data.ownerId == req.driverId && data.viewerId == req.passengerId)
             || (data.ownerId == req.passengerId && data.viewerId == req.driverId));
       }
@@ -161,6 +209,7 @@ service cloud.firestore {
 
     match /ratings/{id} {
       allow read: if member();
+      allow create, update, delete: if sample(id) && isAdmin();
       allow create: if active() && request.resource.data.fromId == uid()
         && id == request.resource.data.rideId + '_' + uid() + '_' + request.resource.data.toId
         && request.resource.data.toId != uid()

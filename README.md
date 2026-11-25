@@ -28,6 +28,10 @@ Contas da demonstração, com senha `carona123`: `demo@sempreuninassau.com.br` (
 
 O cadastro usa e-mail pessoal, confirmado por link, e a matrícula. Só depois de a administração aprovar a matrícula (Perfil > Administração) a pessoa usa as caronas.
 
+Para oferecer carona, a pessoa envia a foto da CNH, que a administração aprova. A foto é apagada depois da decisão.
+
+Para apresentações, a administração pode adicionar e remover motoristas de exemplo (Perfil > Administração). Eles são marcados com "(exemplo)" e os pedidos de vaga são aceitos na hora.
+
 As regras de segurança do banco estão em `firestore.rules`. Para tornar alguém administrador, crie no console do Firebase o documento `admins/<uid da pessoa>`.
 
 ## Testes

@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 
 import '../models/models.dart';
+import 'demo_data.dart';
 import 'document_store.dart';
 import 'ride_search.dart';
 
@@ -74,6 +77,58 @@ class RideRepository {
         ]);
       });
 
+  // CNH -----------------------------------------------------------------------
+
+  /// Cabe em um documento do banco, que aceita até 1 MB.
+  static const int maxLicensePhotoBytes = 600 * 1024;
+
+  Future<Approval> licenseStatus(String userId) async {
+    final json = await _store.get('licenses/$userId');
+    return json == null
+        ? Approval.missing
+        : Approval.values.byName(json['status'] as String);
+  }
+
+  Future<void> sendLicense(AppUser user, Uint8List photo) async {
+    if (photo.length > maxLicensePhotoBytes) {
+      throw const RideException('A foto é muito grande. Tente outra.');
+    }
+    await _store.set('licenses/${user.id}', {
+      'name': user.name,
+      'photo': base64Encode(photo),
+      'status': Approval.pending.name,
+      'createdAt': _nowMs,
+    });
+  }
+
+  Future<List<LicenseRequest>> pendingLicenses() async {
+    final docs = await _store.query(
+      'licenses',
+      where: {'status': Approval.pending.name},
+      limit: 10,
+    );
+    return [for (final d in docs) LicenseRequest.fromJson(d.id, d.data)];
+  }
+
+  /// A foto é apagada na decisão: só a situação fica guardada.
+  Future<void> resolveLicense(
+    LicenseRequest request,
+    AppUser admin, {
+    required bool approve,
+  }) async {
+    await _store.update('licenses/${request.userId}', {
+      'status': (approve ? Approval.approved : Approval.refused).name,
+      'photo': null,
+    });
+    await _notify(
+      admin.id,
+      request.userId,
+      approve
+          ? 'Sua CNH foi aprovada. Você já pode oferecer caronas.'
+          : 'Sua CNH não foi aprovada. Envie outra foto.',
+    );
+  }
+
   // Oferta ------------------------------------------------------------------
 
   Future<void> offer(AppUser user, RideDraft draft) async {
@@ -89,6 +144,11 @@ class RideRepository {
     }
     if (draft.origin.trim().isEmpty || draft.destination.trim().isEmpty) {
       throw const RideException('Informe a origem e o destino.');
+    }
+    if (await licenseStatus(user.id) != Approval.approved) {
+      throw const RideException(
+        'Sua CNH precisa ser aprovada antes de oferecer carona.',
+      );
     }
     await _ensureAllowed(user.id);
 
@@ -258,6 +318,8 @@ class RideRepository {
       ride.driver.id,
       '${user.name} pediu vaga para ${ride.destination}.',
     );
+    // Não há ninguém para aceitar no lugar de um motorista de exemplo.
+    if (isSample(ride.driver.id)) await accept(request);
   }
 
   Future<List<SeatRequest>> receivedRequests(String driverId) async {
@@ -301,7 +363,7 @@ class RideRepository {
       }
     });
     await _notify(
-      request.driverId,
+      isSample(request.driverId) ? request.passengerId : request.driverId,
       request.passengerId,
       'Seu pedido de vaga foi aceito.',
     );
@@ -691,18 +753,93 @@ class RideRepository {
     return result;
   }
 
+  // Exemplos para apresentação ------------------------------------------------
+
+  static bool isSample(String id) => id.startsWith('exemplo_');
+
+  /// Cria (ou renova) caronas fictícias para os próximos dias.
+  Future<void> addSamples() async {
+    await removeSamples();
+    final now = _clock();
+    final writes = <Future<void>>[];
+    final drivers = <String>{};
+    for (final day in [0, 2, 4]) {
+      for (final ride in buildDemoRides(now.add(Duration(days: day)))) {
+        final driver = Driver(
+          id: 'exemplo_${ride.driver.id}',
+          name: '${ride.driver.name} (exemplo)',
+          course: ride.driver.course,
+        );
+        writes.add(
+          _store.set('rides/exemplo_${_nowMs}_${day}_${ride.id}', {
+            ...ride.toJson(),
+            'driverId': driver.id,
+            'driverName': driver.name,
+          }),
+        );
+        if (!drivers.add(driver.id)) continue;
+        writes
+          ..add(
+            _store.set('users/${driver.id}', {
+              'name': driver.name,
+              'course': driver.course,
+              'vehicle': ride.vehicle.toJson(),
+            }),
+          )
+          ..add(
+            _store.set('users/${driver.id}/private/contact', {
+              'phone': '(81) 90000-000${drivers.length}',
+            }),
+          );
+      }
+    }
+    for (final (i, r) in demoRatings.indexed) {
+      writes.add(
+        _store.set('ratings/exemplo_$i', {
+          'rideId': 'exemplo_seed',
+          'fromId': 'exemplo_seed$i',
+          'fromName': r.$2,
+          'toId': 'exemplo_${r.$1}',
+          'stars': r.$3,
+          'text': r.$4,
+          'createdAt': now.millisecondsSinceEpoch,
+        }),
+      );
+    }
+    await Future.wait(writes);
+    _reputations.clear();
+  }
+
+  Future<void> removeSamples() async {
+    final deletes = <Future<void>>[];
+    for (final id in {
+      for (final ride in buildDemoRides(_clock())) 'exemplo_${ride.driver.id}',
+    }) {
+      final rides = await _store.query('rides', where: {'driverId': id});
+      deletes
+        ..addAll(rides.map((r) => _store.delete('rides/${r.id}')))
+        ..add(_store.delete('users/$id/private/contact'))
+        ..add(_store.delete('users/$id'));
+    }
+    for (var i = 0; i < demoRatings.length; i++) {
+      deletes.add(_store.delete('ratings/exemplo_$i'));
+    }
+    await Future.wait(deletes);
+    _reputations.clear();
+  }
+
   // Avisos --------------------------------------------------------------------
 
-  Future<void> _notify(String fromId, String toId, String text) => _store.set(
-    'notices/${_newId()}',
-    {
+  Future<void> _notify(String fromId, String toId, String text) async {
+    if (isSample(toId)) return;
+    await _store.set('notices/${_newId()}', {
       'fromId': fromId,
       'toId': toId,
       'text': text,
       'createdAt': _nowMs,
       'read': false,
-    },
-  );
+    });
+  }
 
   Future<List<AppNotice>> notices(String userId) async {
     final docs = await _store.query('notices', where: {'toId': userId});
@@ -735,6 +872,7 @@ class RideRepository {
         'telefone': user.phone,
         'curso': user.course,
         'matricula': user.registration,
+        'cnh': (await licenseStatus(user.id)).name,
         'veiculo': user.vehicle?.toJson(),
       },
       'caronas': await all('rides', 'driverId'),

@@ -1,6 +1,8 @@
 import 'package:caronauni/data/document_store.dart';
 import 'package:caronauni/data/ride_repository.dart';
 import 'package:caronauni/models/models.dart';
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -26,10 +28,13 @@ void main() {
     email: 'bia@sempreuninassau.com.br',
   );
 
-  setUp(() {
+  setUp(() async {
     now = DateTime(2026, 11, 5, 10);
     store = MemoryStore();
     repo = RideRepository(store, clock: () => now);
+    for (final id in ['d', 'o']) {
+      await store.set('licenses/$id', {'status': 'approved'});
+    }
   });
 
   RideDraft draft(
@@ -161,6 +166,66 @@ void main() {
         'São Sebastião',
       ]);
     });
+  });
+
+  test('exemplos aceitam na hora, renovam e somem', () async {
+    await repo.addSamples();
+    final rides = await repo.search(const RideQuery());
+    expect(rides.length, greaterThan(15));
+    expect(rides.every((r) => r.driver.name.endsWith('(exemplo)')), isTrue);
+    final ride = rides.first;
+    await repo.requestSeat(ride, ana);
+    final request = (await repo.request(ride.id, ana.id))!;
+    expect(request.status, RequestStatus.accepted);
+    expect((await repo.ride(ride.id))!.takenSeats, ride.takenSeats + 1);
+    expect(await repo.phoneOf(ride.driver.id, ana.id), isNotNull);
+    expect((await repo.notices(ana.id)).single.text, contains('aceito'));
+    expect(await store.query('notices'), hasLength(1));
+    await repo.cancelRequest(request, ana);
+    expect((await repo.ride(ride.id))!.takenSeats, ride.takenSeats);
+
+    now = now.add(const Duration(minutes: 1));
+    await repo.addSamples();
+    expect(await repo.search(const RideQuery()), hasLength(rides.length));
+    await repo.removeSamples();
+    expect(await repo.search(const RideQuery()), isEmpty);
+    expect(await store.query('users'), isEmpty);
+    expect(await store.query('ratings'), isEmpty);
+    await repo.myRides(ana.id);
+  });
+
+  test('oferta exige CNH aprovada, e a foto some na decisão', () async {
+    const admin = AppUser(id: 'adm', name: 'Adm', email: 'adm@gmail.com');
+    const bob = AppUser(
+      id: 'bob',
+      name: 'Bob Melo',
+      email: 'bob@gmail.com',
+      vehicle: vehicle,
+    );
+    final at = DateTime(2026, 11, 5, 18);
+    final photo = Uint8List.fromList([1, 2, 3]);
+    await expectLater(repo.offer(bob, draft(at)), fails('CNH'));
+    await expectLater(
+      repo.sendLicense(
+        bob,
+        Uint8List(RideRepository.maxLicensePhotoBytes + 1),
+      ),
+      fails('grande'),
+    );
+    await repo.sendLicense(bob, photo);
+    await expectLater(repo.offer(bob, draft(at)), fails('CNH'));
+    var request = (await repo.pendingLicenses()).single;
+    expect(request.photo, photo);
+    await repo.resolveLicense(request, admin, approve: false);
+    expect(await repo.licenseStatus('bob'), Approval.refused);
+    expect((await store.get('licenses/bob'))!['photo'], isNull);
+    await expectLater(repo.offer(bob, draft(at)), fails('CNH'));
+    await repo.sendLicense(bob, photo);
+    request = (await repo.pendingLicenses()).single;
+    await repo.resolveLicense(request, admin, approve: true);
+    expect((await store.get('licenses/bob'))!['photo'], isNull);
+    expect(await repo.notices('bob'), hasLength(2));
+    await repo.offer(bob, draft(at));
   });
 
   test('matrícula repetida ou bloqueada é sinalizada', () async {

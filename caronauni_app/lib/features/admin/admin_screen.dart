@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -11,6 +13,7 @@ import '../shared/reloadable.dart';
 
 typedef _Data = ({
   List<ApprovalRequest> approvals,
+  List<LicenseRequest> licenses,
   List<Report> reports,
   List<Fault> faults,
   List<Document> blocked,
@@ -30,6 +33,7 @@ class _AdminScreenState extends State<AdminScreen> {
 
   Future<_Data> _load(RideRepository r) async => (
     approvals: await r.pendingApprovals(),
+    licenses: await r.pendingLicenses(),
     reports: await r.openReports(),
     faults: await r.contestedFaults(),
     blocked: await r.blockedUsers(),
@@ -58,11 +62,13 @@ class _AdminScreenState extends State<AdminScreen> {
             required String yes,
             required Future<void> Function() onNo,
             required Future<void> Function() onYes,
+            Uint8List? photo,
           }) => Card(
             margin: const EdgeInsets.only(bottom: 8),
             child: Column(
               children: [
                 ListTile(title: Text(title), subtitle: Text(subtitle)),
+                if (photo != null) _Photo(photo),
                 OverflowBar(
                   children: [
                     TextButton(onPressed: () => act(onNo), child: Text(no)),
@@ -86,6 +92,20 @@ class _AdminScreenState extends State<AdminScreen> {
                 yes: 'Aprovar',
                 onNo: () => repository.resolveApproval(a, approve: false),
                 onYes: () => repository.resolveApproval(a, approve: true),
+              ),
+            const SectionTitle('CNHs para aprovar'),
+            if (data.licenses.isEmpty) const EmptyText('Nenhuma pendente.'),
+            for (final l in data.licenses)
+              decision(
+                title: l.name,
+                subtitle:
+                    'Confira nome, categoria e validade. '
+                    'Toque na foto para ampliar.',
+                photo: l.photo,
+                no: 'Recusar CNH',
+                yes: 'Aprovar CNH',
+                onNo: () => repository.resolveLicense(l, admin, approve: false),
+                onYes: () => repository.resolveLicense(l, admin, approve: true),
               ),
             const SectionTitle('Denúncias'),
             if (data.reports.isEmpty) const EmptyText('Nenhuma em aberto.'),
@@ -126,6 +146,23 @@ class _AdminScreenState extends State<AdminScreen> {
                   child: const Text('Desbloquear'),
                 ),
               ),
+            const SectionTitle('Exemplos para apresentação'),
+            const EmptyText(
+              'Motoristas fictícios, visíveis para todos, que aceitam pedidos '
+              'na hora. Renove no dia da apresentação e remova depois.',
+            ),
+            OverflowBar(
+              children: [
+                TextButton(
+                  onPressed: () => act(repository.removeSamples),
+                  child: const Text('Remover exemplos'),
+                ),
+                TextButton(
+                  onPressed: () => act(repository.addSamples),
+                  child: const Text('Adicionar ou renovar'),
+                ),
+              ],
+            ),
             const SectionTitle('Uso do app'),
             SegmentedButton<int>(
               segments: const [
@@ -147,6 +184,29 @@ class _AdminScreenState extends State<AdminScreen> {
           ];
         },
       ),
+    );
+  }
+}
+
+class _Photo extends StatelessWidget {
+  const _Photo(this.bytes);
+
+  final Uint8List bytes;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget image() => Image.memory(
+      bytes,
+      fit: BoxFit.contain,
+      errorBuilder: (_, _, _) =>
+          const Text('Esta imagem não pode ser aberta.'),
+    );
+    return InkWell(
+      onTap: () => showDialog<void>(
+        context: context,
+        builder: (_) => Dialog(child: InteractiveViewer(child: image())),
+      ),
+      child: SizedBox(height: 180, child: image()),
     );
   }
 }

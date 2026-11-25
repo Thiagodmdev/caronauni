@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import '../data/document_store.dart';
 
 /// Situação da matrícula: só quem foi aprovado usa as caronas.
@@ -20,6 +23,25 @@ class ApprovalRequest {
 
   /// A matrícula já aparece em outra conta, aprovada ou bloqueada.
   final bool repeated;
+}
+
+/// CNH esperando a conferência da administração.
+class LicenseRequest {
+  const LicenseRequest({
+    required this.userId,
+    required this.name,
+    required this.photo,
+  });
+
+  factory LicenseRequest.fromJson(String id, Json json) => LicenseRequest(
+    userId: id,
+    name: json['name'] as String,
+    photo: base64Decode(json['photo'] as String),
+  );
+
+  final String userId;
+  final String name;
+  final Uint8List photo;
 }
 
 class AppUser {

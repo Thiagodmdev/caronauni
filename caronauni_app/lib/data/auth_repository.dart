@@ -93,6 +93,7 @@ class ProfileStore {
 
   Future<void> remove(String id) async {
     await _store.delete('approvals/$id');
+    await _store.delete('licenses/$id');
     await _store.delete('users/$id/private/contact');
     await _store.delete('users/$id');
   }
