@@ -206,6 +206,16 @@ void main() {
     }
     await tapText(tester, 'Minha CNH');
     expect(find.text('CNH aprovada'), findsOneWidget);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    await tapText(tester, 'Buscar');
+    await tapText(tester, 'Horário');
+    await tester.ensureVisible(find.byKey(const ValueKey('hora 18')));
+    await tester.tap(find.byKey(const ValueKey('hora 18')));
+    await tester.ensureVisible(find.byKey(const ValueKey('minuto 25')));
+    await tester.tap(find.byKey(const ValueKey('minuto 25')));
+    await tapText(tester, 'Usar este horário');
+    expect(find.text('Por volta de 18:25'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

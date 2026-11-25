@@ -12,6 +12,7 @@ import '../profile/vehicle_screen.dart';
 import '../shared/feedback.dart';
 import '../shared/reloadable.dart';
 import '../shared/road.dart';
+import '../shared/time_sheet.dart';
 
 class OfferScreen extends StatefulWidget {
   const OfferScreen({super.key, required this.onCreated});
@@ -107,9 +108,10 @@ class _OfferScreenState extends State<OfferScreen> {
   }
 
   Future<void> _pickTime() async {
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: TimeOfDay.fromDateTime(_departure),
+    final picked = await pickTime(
+      context,
+      title: 'Horário de saída',
+      initial: TimeOfDay.fromDateTime(_departure),
     );
     if (picked == null) return;
     setState(

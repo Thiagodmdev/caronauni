@@ -10,6 +10,7 @@ import '../ride_detail/ride_detail_screen.dart';
 import '../shared/person_avatar.dart';
 import '../shared/rating_label.dart';
 import '../shared/road.dart';
+import '../shared/time_sheet.dart';
 import 'search_view_model.dart';
 
 class SearchScreen extends StatelessWidget {
@@ -86,10 +87,10 @@ class _Filters extends StatelessWidget {
 
   Future<void> _pickTime(BuildContext context) async {
     final minutes = viewModel.minutesOfDay;
-    final picked = await showTimePicker(
-      context: context,
-      helpText: 'Horário de saída desejado',
-      initialTime: minutes == null
+    final picked = await pickTime(
+      context,
+      title: 'Horário de saída desejado',
+      initial: minutes == null
           ? TimeOfDay.now()
           : TimeOfDay(hour: minutes ~/ 60, minute: minutes % 60),
     );
