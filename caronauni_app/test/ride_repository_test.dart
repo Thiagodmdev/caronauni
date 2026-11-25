@@ -265,6 +265,14 @@ void main() {
       await ask(next, ana);
     });
 
+    test('não aceita pedido nos 30 min antes da saída (EX03)', () async {
+      final ride = await offer(DateTime(2026, 11, 5, 18));
+      now = DateTime(2026, 11, 5, 17, 30);
+      await expectLater(repo.requestSeat(ride, ana), fails('30 minutos'));
+      now = DateTime(2026, 11, 5, 17, 29);
+      await repo.requestSeat(ride, ana);
+    });
+
     test('só a aceitação ocupa vaga e nunca passa do limite', () async {
       final ride = await offer(DateTime(2026, 11, 5, 18));
       final first = await ask(ride, ana);

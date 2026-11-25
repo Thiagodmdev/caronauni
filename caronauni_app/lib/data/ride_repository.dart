@@ -289,6 +289,14 @@ class RideRepository {
     if (!current.departure.isAfter(_clock())) {
       throw const RideException('Esta carona já saiu.');
     }
+    // Depois disso o pedido já nasceria expirado (EX03).
+    if (!current.departure
+        .subtract(const Duration(minutes: 30))
+        .isAfter(_clock())) {
+      throw const RideException(
+        'Os pedidos se encerram 30 minutos antes da saída.',
+      );
+    }
     if (current.availableSeats <= 0) {
       throw const RideException('Esta carona já está lotada.');
     }

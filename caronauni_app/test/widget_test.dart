@@ -16,7 +16,7 @@ const _pixel =
 void main() {
   final now = DateTime(2026, 11, 5, 10);
 
-  Future<void> pumpApp(WidgetTester tester, {Size? small}) async {
+  Future<MemoryStore> pumpApp(WidgetTester tester, {Size? small}) async {
     tester.view.physicalSize = small ?? const Size(1080, 2400);
     tester.view.devicePixelRatio = small == null ? 2.75 : 1;
     addTearDown(tester.view.reset);
@@ -37,6 +37,7 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    return store;
   }
 
   Future<void> fill(WidgetTester tester, String label, String text) =>
@@ -89,7 +90,11 @@ void main() {
     await tapText(tester, 'Pedir vaga');
     await tester.tap(find.widgetWithText(TextButton, 'Pedir vaga'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Pedido enviado'), findsOneWidget);
+    expect(find.text('Aguardando Marina aceitar'), findsOneWidget);
+    expect(find.textContaining('O pedido vale até'), findsOneWidget);
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    expect(find.text('Acompanhar pedido'), findsOneWidget);
     expect(find.byTooltip('WhatsApp'), findsNothing);
     await tester.tap(find.byType(BackButton));
     await tester.pumpAndSettle();
@@ -111,6 +116,31 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('(81) 90000-0002'), findsOneWidget);
     expect(find.byTooltip('WhatsApp'), findsOneWidget);
+  });
+
+  testWidgets('a espera se atualiza sozinha quando o motorista aceita', (
+    tester,
+  ) async {
+    final store = await pumpApp(tester);
+    await signIn(tester);
+    await tester.enterText(find.byType(TextField), 'jardim');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Jardim América').first);
+    await tester.pumpAndSettle();
+    await tapText(tester, 'Pedir vaga');
+    await tester.tap(find.widgetWithText(TextButton, 'Pedir vaga'));
+    await tester.pumpAndSettle();
+    expect(find.text('Vaga confirmada'), findsNothing);
+
+    final repository = RideRepository(store, clock: () => now);
+    await repository.accept(
+      (await repository.request('r1', 'demo'))!,
+    );
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pumpAndSettle();
+    expect(find.text('Vaga confirmada'), findsOneWidget);
+    await tapText(tester, 'Ver carona e contato');
+    expect(find.text('(81) 90000-0002'), findsOneWidget);
   });
 
   testWidgets('avalia uma carona já feita', (tester) async {

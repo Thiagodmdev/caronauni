@@ -318,10 +318,13 @@ class SeatRequest {
   /// Expira em 2h ou 30 min antes da saída, o que vier primeiro (EX03).
   RequestStatus statusAt(DateTime now) {
     if (status != RequestStatus.pending) return status;
+    return now.isAfter(expiresAt) ? RequestStatus.expired : status;
+  }
+
+  DateTime get expiresAt {
     final byAge = createdAt.add(const Duration(hours: 2));
     final byDeparture = departure.subtract(const Duration(minutes: 30));
-    final limit = byAge.isBefore(byDeparture) ? byAge : byDeparture;
-    return now.isAfter(limit) ? RequestStatus.expired : status;
+    return byAge.isBefore(byDeparture) ? byAge : byDeparture;
   }
 }
 

@@ -387,6 +387,7 @@ class SignPanel extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     width: double.infinity,
     padding: padding ?? const EdgeInsets.fromLTRB(20, 4, 20, 24),
+    clipBehavior: Clip.antiAlias,
     decoration: const BoxDecoration(
       color: AppColors.plate,
       borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),

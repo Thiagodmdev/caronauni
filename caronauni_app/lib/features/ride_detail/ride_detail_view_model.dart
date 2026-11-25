@@ -22,6 +22,7 @@ class RideDetailViewModel extends ChangeNotifier {
   RequestStatus? get status => _status;
 
   SeatRequest? _request;
+  SeatRequest? get request => _request;
 
   Reputation? _reputation;
   Reputation? get reputation => _reputation;
@@ -45,6 +46,15 @@ class RideDetailViewModel extends ChangeNotifier {
     final request = _request;
     if (request != null) await _repository.cancelRequest(request, _user);
   });
+
+  /// Consulta a resposta sem bloquear a tela; falha de rede é ignorada, pois a
+  /// próxima consulta tenta de novo.
+  Future<void> refresh() async {
+    try {
+      await _refresh();
+      if (!_disposed) notifyListeners();
+    } catch (_) {}
+  }
 
   Future<void> _refresh() async {
     _reputation ??= await _repository.reputation(ride.driver.id);

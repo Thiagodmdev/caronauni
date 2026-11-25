@@ -35,7 +35,8 @@ List<Ride> buildDemoRides(DateTime now) {
     now.day,
     now.hour,
   ).add(const Duration(hours: 1));
-  DateTime soon(int minutes) => start.add(Duration(minutes: minutes + 15));
+  // Longe o bastante para o pedido de vaga não nascer expirado.
+  DateTime soon(int minutes) => start.add(Duration(minutes: minutes + 45));
   DateTime onDay(int offset, int hour, int minute) =>
       DateTime(now.year, now.month, now.day + offset, hour, minute);
 

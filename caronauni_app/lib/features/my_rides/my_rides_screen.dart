@@ -6,6 +6,7 @@ import '../../data/document_store.dart';
 import '../../data/ride_repository.dart';
 import '../../models/models.dart';
 import '../auth/session_controller.dart';
+import '../ride_detail/request_status_screen.dart';
 import '../ride_detail/ride_detail_screen.dart';
 import '../shared/feedback.dart';
 import '../shared/person_avatar.dart';
@@ -148,7 +149,7 @@ class _RideTile extends StatelessWidget {
           '${mine.ride.totalSeats} vagas ocupadas';
     }
     return switch (mine.status!) {
-      RequestStatus.pending => 'Aguardando resposta',
+      RequestStatus.pending => 'Aguardando ${mine.ride.driver.name} aceitar',
       RequestStatus.accepted => 'Confirmada com ${mine.ride.driver.name}',
       RequestStatus.refused => 'Pedido recusado',
       RequestStatus.cancelled => 'Você cancelou',
@@ -229,11 +230,16 @@ class _RideTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => RideDetailScreen(ride: ride),
-          ),
-        ),
+        onTap: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => mine.status == RequestStatus.pending
+                  ? RequestStatusScreen(ride: ride)
+                  : RideDetailScreen(ride: ride),
+            ),
+          );
+          await reload();
+        },
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(

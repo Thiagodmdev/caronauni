@@ -11,6 +11,7 @@ import '../shared/feedback.dart';
 import '../shared/person_avatar.dart';
 import '../shared/rating_label.dart';
 import '../shared/road.dart';
+import 'request_status_screen.dart';
 import 'ride_detail_view_model.dart';
 import 'ride_map.dart';
 
@@ -402,7 +403,19 @@ class _RequestBar extends StatelessWidget {
         ],
       ),
     );
-    if (confirmed == true) await viewModel.requestSeat();
+    if (confirmed != true) return;
+    await viewModel.requestSeat();
+    if (viewModel.error == null && context.mounted) await _openStatus(context);
+  }
+
+  Future<void> _openStatus(BuildContext context) async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            RequestStatusScreen(ride: viewModel.ride, fromDetail: true),
+      ),
+    );
+    if (context.mounted) await viewModel.refresh();
   }
 
   @override
@@ -447,9 +460,7 @@ class _RequestBar extends StatelessWidget {
                       child: Text(
                         viewModel.status == RequestStatus.accepted
                             ? 'Vaga confirmada. Boa viagem!'
-                            : 'Pedido enviado. Aguardando a resposta de quem '
-                                  'dirige. O telefone aparece depois da '
-                                  'aceitação.',
+                            : 'Aguardando a resposta de quem dirige.',
                         style: theme.textTheme.bodyMedium,
                       ),
                     ),
@@ -457,6 +468,14 @@ class _RequestBar extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
+              if (viewModel.status == RequestStatus.pending) ...[
+                FilledButton(
+                  style: AppTheme.laneButton,
+                  onPressed: () => _openStatus(context),
+                  child: const Text('Acompanhar pedido'),
+                ),
+                const SizedBox(height: 8),
+              ],
               OutlinedButton(
                 onPressed: viewModel.busy ? null : viewModel.cancelRequest,
                 child: Text(
