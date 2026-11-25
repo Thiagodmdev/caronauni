@@ -32,7 +32,7 @@ class _RatingLabelState extends State<RatingLabel> {
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.star_rounded, size: 18, color: Colors.amber.shade700),
+            Icon(Icons.star_rounded, size: 18, color: const Color(0xFFE09B00)),
             const SizedBox(width: 2),
             Text(
               widget.showCount

@@ -18,7 +18,8 @@ class PersonAvatar extends StatelessWidget {
         initialsOf(name),
         style: TextStyle(
           fontSize: radius * 0.8,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w800,
+          height: 1.2,
           color: scheme.onPrimaryContainer,
         ),
       ),

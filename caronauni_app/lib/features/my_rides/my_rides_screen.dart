@@ -11,6 +11,7 @@ import '../shared/feedback.dart';
 import '../shared/person_avatar.dart';
 import '../shared/rating_label.dart';
 import '../shared/reloadable.dart';
+import '../shared/road.dart';
 import 'rate_dialog.dart';
 
 typedef _Data = ({
@@ -155,6 +156,17 @@ class _RideTile extends StatelessWidget {
     };
   }
 
+  PillTone get _tone {
+    if (mine.ride.cancelled) return PillTone.bad;
+    if (mine.isDriver) return PillTone.good;
+    return switch (mine.status!) {
+      RequestStatus.pending => PillTone.waiting,
+      RequestStatus.accepted => PillTone.good,
+      RequestStatus.refused => PillTone.bad,
+      RequestStatus.cancelled || RequestStatus.expired => PillTone.neutral,
+    };
+  }
+
   Future<void> _rate(BuildContext context) async {
     final repository = context.read<RideRepository>();
     final user = context.read<SessionController>().user!;
@@ -212,32 +224,52 @@ class _RideTile extends StatelessWidget {
       await reload();
     }
 
+    final text = Theme.of(context).textTheme;
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 12),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          ListTile(
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => RideDetailScreen(ride: ride),
-              ),
-            ),
-            title: Text('${ride.origin} → ${ride.destination}'),
-            subtitle: Text(
-              '${formatDay(ride.departure, repository.now)}, '
-              '${formatTime(ride.departure)}\n$_status',
-            ),
-            isThreeLine: true,
+      child: InkWell(
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => RideDetailScreen(ride: ride),
           ),
-          if (canCancel)
-            TextButton(onPressed: cancel, child: const Text('Cancelar')),
-          if (took && repository.canRate(ride))
-            TextButton(
-              onPressed: () => _rate(context),
-              child: const Text('Avaliar ou informar falta'),
-            ),
-        ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${formatDay(ride.departure, repository.now)}, '
+                '${formatTime(ride.departure)}',
+                style: text.titleLarge,
+              ),
+              const SizedBox(height: 12),
+              RouteStops(from: ride.origin, to: ride.destination),
+              const SizedBox(height: 14),
+              StatusPill(_status, tone: _tone),
+              if (canCancel || (took && repository.canRate(ride)))
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: OverflowBar(
+                    alignment: MainAxisAlignment.end,
+                    children: [
+                      if (canCancel)
+                        TextButton(
+                          onPressed: cancel,
+                          child: const Text('Cancelar'),
+                        ),
+                      if (took && repository.canRate(ride))
+                        TextButton(
+                          onPressed: () => _rate(context),
+                          child: const Text('Avaliar ou informar falta'),
+                        ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -261,7 +293,7 @@ class _RecurrenceTile extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        title: Text('${ride['origin']} → ${ride['destination']}'),
+        title: Text('De ${ride['origin']} para ${ride['destination']}'),
         subtitle: Text('$days às ${formatMinutesOfDay(minutes)}'),
         trailing: TextButton(
           onPressed: () async {

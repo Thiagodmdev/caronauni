@@ -7,6 +7,7 @@ import 'package:caronauni/data/document_store.dart';
 import 'package:caronauni/data/ride_repository.dart';
 import 'package:caronauni/features/profile/license_screen.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const _pixel =
@@ -15,9 +16,9 @@ const _pixel =
 void main() {
   final now = DateTime(2026, 11, 5, 10);
 
-  Future<void> pumpApp(WidgetTester tester) async {
-    tester.view.physicalSize = const Size(1080, 2400);
-    tester.view.devicePixelRatio = 2.75;
+  Future<void> pumpApp(WidgetTester tester, {Size? small}) async {
+    tester.view.physicalSize = small ?? const Size(1080, 2400);
+    tester.view.devicePixelRatio = small == null ? 2.75 : 1;
     addTearDown(tester.view.reset);
     final store = MemoryStore();
     await seedDemo(store, now);
@@ -150,6 +151,32 @@ void main() {
     await signIn(tester, MockAuthRepository.driverEmail);
     await tapText(tester, 'Oferecer');
     expect(find.text('Publicar carona'), findsOneWidget);
+  });
+
+  // RNF02: celular de 4,7", sem conteúdo cortado em nenhuma aba.
+  testWidgets('cabe em tela pequena', (tester) async {
+    final font = FontLoader('Overpass');
+    for (final name in ['Regular', 'SemiBold', 'Bold', 'ExtraBold']) {
+      font.addFont(rootBundle.load('assets/fonts/Overpass-$name.ttf'));
+    }
+    await font.load();
+    await pumpApp(tester, small: const Size(360, 640));
+    await signIn(tester, MockAuthRepository.driverEmail);
+    await tester.enterText(find.byType(TextField), 'centro');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Centro').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Pedir vaga'), findsOneWidget);
+    await tester.drag(find.byType(ListView), const Offset(0, -600));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(BackButton));
+    await tester.pumpAndSettle();
+    for (final tab in ['Caronas', 'Oferecer', 'Avisos', 'Perfil']) {
+      await tapText(tester, tab);
+    }
+    await tapText(tester, 'Minha CNH');
+    expect(find.text('CNH aprovada'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('envia CNH e o admin aprova pela foto', (tester) async {

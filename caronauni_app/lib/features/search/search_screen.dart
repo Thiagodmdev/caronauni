@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/formatters.dart';
+import '../../core/theme.dart';
 import '../../data/ride_repository.dart';
 import '../auth/session_controller.dart';
 import '../../models/models.dart';
 import '../ride_detail/ride_detail_screen.dart';
 import '../shared/person_avatar.dart';
 import '../shared/rating_label.dart';
+import '../shared/road.dart';
 import 'search_view_model.dart';
 
 class SearchScreen extends StatelessWidget {
@@ -30,21 +32,13 @@ class _SearchView extends StatelessWidget {
     final viewModel = context.watch<SearchViewModel>();
     final user = context.read<SessionController>().user;
 
+    final text = Theme.of(context).textTheme;
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Olá, ${user?.firstName ?? ''}',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const Text('Para onde você vai?'),
-          ],
+        title: Text(
+          'Olá, ${user?.firstName ?? ''}',
+          style: text.titleMedium?.copyWith(color: Colors.white),
         ),
-        toolbarHeight: 72,
         actions: [
           IconButton(
             tooltip: 'Sair',
@@ -56,19 +50,28 @@ class _SearchView extends StatelessWidget {
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-            child: TextField(
-              onChanged: viewModel.setDestination,
-              textInputAction: TextInputAction.search,
-              decoration: const InputDecoration(
-                hintText: 'Buscar destino (ex.: Centro)',
-                prefixIcon: Icon(Icons.search),
-              ),
+          SignPanel(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Para onde você vai?',
+                  style: text.headlineMedium?.copyWith(color: Colors.white),
+                ),
+                const SizedBox(height: 14),
+                TextField(
+                  onChanged: viewModel.setDestination,
+                  textInputAction: TextInputAction.search,
+                  decoration: const InputDecoration(
+                    hintText: 'Buscar destino (ex.: Centro)',
+                    prefixIcon: Icon(Icons.search, color: AppColors.plate),
+                  ),
+                ),
+              ],
             ),
           ),
           _Filters(viewModel: viewModel),
-          const Divider(height: 1),
           Expanded(child: _Results(viewModel: viewModel)),
         ],
       ),
@@ -104,7 +107,7 @@ class _Filters extends StatelessWidget {
 
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Row(
         children: [
           for (final entry in labels.entries) ...[
@@ -153,7 +156,7 @@ class _Results extends StatelessWidget {
     }
     if (viewModel.rides.isEmpty) return const _EmptyResults();
     return ListView.separated(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
       itemCount: viewModel.rides.length,
       separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
@@ -182,7 +185,10 @@ class _EmptyResults extends StatelessWidget {
               color: theme.colorScheme.onSurfaceVariant,
             ),
             const SizedBox(height: 12),
-            Text('Nenhuma carona encontrada', style: theme.textTheme.titleMedium),
+            Text(
+              'Nenhuma carona encontrada',
+              style: theme.textTheme.titleMedium,
+            ),
             const SizedBox(height: 4),
             Text(
               'Tente outro destino, data ou horário.',
@@ -213,68 +219,60 @@ class _RideCard extends StatelessWidget {
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => RideDetailScreen(ride: ride),
-          ),
+          MaterialPageRoute<void>(builder: (_) => RideDetailScreen(ride: ride)),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        formatTime(ride.departure),
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      Text(
-                        formatDay(ride.departure, DateTime.now()),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          ride.destination,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        Text(
-                          'Saindo de ${ride.origin}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
+                  Text(
+                    formatDay(ride.departure, DateTime.now()),
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: scheme.onSurfaceVariant,
                     ),
                   ),
+                  const Spacer(),
                   Text(
                     formatPrice(ride.price),
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: scheme.primary,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      color: AppColors.go,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: RouteStops(
+                      from: 'Saindo de ${ride.origin}',
+                      to: ride.destination,
+                      fromTime: formatTime(ride.departure),
+                      toTime: formatTime(ride.arrival),
+                      emphasizeTo: true,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      SeatRow(total: ride.totalSeats, free: seats),
+                      Text(
+                        seats == 1 ? '1 vaga' : '$seats vagas',
+                        style: theme.textTheme.labelLarge,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
               Row(
                 children: [
-                  PersonAvatar(name: ride.driver.name, radius: 14),
+                  PersonAvatar(name: ride.driver.name, radius: 15),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -283,18 +281,8 @@ class _RideCard extends StatelessWidget {
                       style: theme.textTheme.bodyMedium,
                     ),
                   ),
+                  const SizedBox(width: 8),
                   RatingLabel(userId: ride.driver.id),
-                  const SizedBox(width: 12),
-                  Icon(
-                    Icons.event_seat_outlined,
-                    size: 18,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    seats == 1 ? '1 vaga' : '$seats vagas',
-                    style: theme.textTheme.bodyMedium,
-                  ),
                 ],
               ),
             ],

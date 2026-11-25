@@ -15,6 +15,7 @@ import '../shared/feedback.dart';
 import '../shared/person_avatar.dart';
 import '../shared/rating_label.dart';
 import '../shared/reloadable.dart';
+import '../shared/road.dart';
 import 'license_screen.dart';
 import 'vehicle_screen.dart';
 
@@ -50,113 +51,163 @@ class ProfileScreen extends StatelessWidget {
     final user = session.user;
     if (user == null) return const SizedBox.shrink();
     final repository = context.read<RideRepository>();
-    void open(Widget screen) => Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => screen));
+    final text = Theme.of(context).textTheme;
+    void open(Widget screen) =>
+        Navigator.of(context)
+            .push(MaterialPageRoute<void>(builder: (_) => screen));
 
     return Scaffold(
       appBar: AppBar(title: const Text('Perfil')),
-      body: Reloadable<(List<Fault>, DateTime?)>(
-        load: () async => (
-          await repository.faults(user.id),
-          await repository.suspendedUntil(user.id),
-        ),
-        builder: (context, data, reload) {
-          final (faults, suspended) = data;
-          return [
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: PersonAvatar(name: user.name, radius: 28),
-              title: Text(user.name),
-              subtitle: Text('${user.course}\n${user.email}'),
-              trailing: RatingLabel(userId: user.id),
-              isThreeLine: true,
-            ),
-            if (suspended != null)
-              Card(
-                color: Theme.of(context).colorScheme.errorContainer,
-                child: ListTile(
-                  leading: const Icon(Icons.block),
-                  title: Text(
-                    'Conta suspensa até ${suspended.day}/${suspended.month}/'
-                    '${suspended.year}',
+      body: Column(
+        children: [
+          SignPanel(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 22),
+            child: DefaultTextStyle.merge(
+              style: const TextStyle(color: Colors.white),
+              child: Row(
+                children: [
+                  PersonAvatar(name: user.name, radius: 34),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user.name,
+                          style: text.titleLarge?.copyWith(color: Colors.white),
+                        ),
+                        Text(user.course),
+                        Text(
+                          user.email,
+                          overflow: TextOverflow.ellipsis,
+                          style: text.bodySmall?.copyWith(color: Colors.white),
+                        ),
+                        const SizedBox(height: 4),
+                        RatingLabel(userId: user.id),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ),
-            ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: const Text('Editar perfil'),
-              onTap: () => open(const EditProfileScreen()),
             ),
-            ListTile(
-              leading: const Icon(Icons.directions_car_outlined),
-              title: const Text('Meu veículo'),
-              subtitle: Text(
-                user.vehicle == null
-                    ? 'Não cadastrado'
-                    : '${user.vehicle!.model} (${user.vehicle!.plate})',
+          ),
+          Expanded(
+            child: Reloadable<(List<Fault>, DateTime?)>(
+              load: () async => (
+                await repository.faults(user.id),
+                await repository.suspendedUntil(user.id),
               ),
-              onTap: () => open(const VehicleScreen()),
+              builder: (context, data, reload) {
+                final (faults, suspended) = data;
+                return [
+                  if (suspended != null)
+                    Card(
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      child: ListTile(
+                        leading: const Icon(Icons.block),
+                        title: Text(
+                          'Conta suspensa até ${suspended.day}/${suspended.month}/'
+                          '${suspended.year}',
+                        ),
+                      ),
+                    ),
+                  Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.edit_outlined),
+                          title: const Text('Editar perfil'),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => open(const EditProfileScreen()),
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.directions_car_outlined),
+                          title: const Text('Meu veículo'),
+                          subtitle: Text(
+                            user.vehicle == null
+                                ? 'Não cadastrado'
+                                : '${user.vehicle!.model} (${user.vehicle!.plate})',
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => open(const VehicleScreen()),
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.badge_outlined),
+                          title: const Text('Minha CNH'),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () => open(const LicenseScreen()),
+                        ),
+                        if (user.isAdmin)
+                          ListTile(
+                            leading: const Icon(
+                              Icons.admin_panel_settings_outlined,
+                            ),
+                            title: const Text('Administração'),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => open(const AdminScreen()),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SectionTitle('Faltas'),
+                  if (faults.isEmpty) const EmptyText('Você não tem faltas.'),
+                  for (final fault in faults)
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(fault.reason),
+                      subtitle: Text(
+                        '${formatDay(fault.createdAt, repository.now)} · '
+                        '${switch (fault.status) {
+                          'contested' => 'Em análise',
+                          'kept' => 'Mantida',
+                          'dismissed' => 'Retirada',
+                          _ => 'Registrada',
+                        }}',
+                      ),
+                      trailing: fault.status == 'active'
+                          ? TextButton(
+                              onPressed: () async {
+                                await runAction(
+                                  context,
+                                  () => repository.contest(fault),
+                                  success: 'Contestação enviada.',
+                                );
+                                await reload();
+                              },
+                              child: const Text('Contestar'),
+                            )
+                          : null,
+                    ),
+                  const SectionTitle('Privacidade'),
+                  Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: Column(
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.copy_all_outlined),
+                          title: const Text('Copiar meus dados'),
+                          onTap: () => _export(context, user),
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.delete_outline),
+                          title: const Text('Excluir conta'),
+                          onTap: () => _delete(context),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: session.signOut,
+                    icon: const Icon(Icons.logout),
+                    label: const Text('Sair'),
+                  ),
+                ];
+              },
             ),
-            ListTile(
-              leading: const Icon(Icons.badge_outlined),
-              title: const Text('Minha CNH'),
-              onTap: () => open(const LicenseScreen()),
-            ),
-            if (user.isAdmin)
-              ListTile(
-                leading: const Icon(Icons.admin_panel_settings_outlined),
-                title: const Text('Administração'),
-                onTap: () => open(const AdminScreen()),
-              ),
-            const SectionTitle('Faltas'),
-            if (faults.isEmpty) const EmptyText('Você não tem faltas.'),
-            for (final fault in faults)
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(fault.reason),
-                subtitle: Text(
-                  '${formatDay(fault.createdAt, repository.now)} · '
-                  '${switch (fault.status) {
-                    'contested' => 'Em análise',
-                    'kept' => 'Mantida',
-                    'dismissed' => 'Retirada',
-                    _ => 'Registrada',
-                  }}',
-                ),
-                trailing: fault.status == 'active'
-                    ? TextButton(
-                        onPressed: () async {
-                          await runAction(
-                            context,
-                            () => repository.contest(fault),
-                            success: 'Contestação enviada.',
-                          );
-                          await reload();
-                        },
-                        child: const Text('Contestar'),
-                      )
-                    : null,
-              ),
-            const SectionTitle('Privacidade'),
-            ListTile(
-              leading: const Icon(Icons.copy_all_outlined),
-              title: const Text('Copiar meus dados'),
-              onTap: () => _export(context, user),
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline),
-              title: const Text('Excluir conta'),
-              onTap: () => _delete(context),
-            ),
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              onPressed: session.signOut,
-              icon: const Icon(Icons.logout),
-              label: const Text('Sair'),
-            ),
-          ];
-        },
+          ),
+        ],
       ),
     );
   }

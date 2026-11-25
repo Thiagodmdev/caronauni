@@ -82,7 +82,7 @@ class _RatePersonState extends State<_RatePerson> {
                   onPressed: () => setState(() => _stars = i),
                   icon: Icon(
                     i <= _stars ? Icons.star_rounded : Icons.star_outline_rounded,
-                    color: Colors.amber.shade700,
+                    color: const Color(0xFFE09B00),
                   ),
                 ),
             ],

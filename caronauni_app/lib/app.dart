@@ -44,7 +44,7 @@ class CaronaUniApp extends StatelessWidget {
           GlobalCupertinoLocalizations.delegate,
         ],
         builder: (context, child) => ColoredBox(
-          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          color: const Color(0xFFDCE3F4),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: _maxContentWidth),

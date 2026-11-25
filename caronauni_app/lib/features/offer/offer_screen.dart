@@ -3,12 +3,15 @@ import 'package:provider/provider.dart';
 
 import '../../core/formatters.dart';
 import '../../core/geocoding.dart';
+import '../../core/theme.dart';
 import '../../data/ride_repository.dart';
 import '../../models/models.dart';
 import '../auth/session_controller.dart';
 import '../profile/license_screen.dart';
 import '../profile/vehicle_screen.dart';
 import '../shared/feedback.dart';
+import '../shared/reloadable.dart';
+import '../shared/road.dart';
 
 class OfferScreen extends StatefulWidget {
   const OfferScreen({super.key, required this.onCreated});
@@ -222,12 +225,13 @@ class _OfferScreenState extends State<OfferScreen> {
     );
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       child: Form(
         key: _formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const SectionTitle('Trajeto'),
             field(_origin, 'Saindo de (bairro ou campus)', validator: required),
             gap,
             field(_originDetail, 'Ponto de encontro', validator: required),
@@ -235,7 +239,7 @@ class _OfferScreenState extends State<OfferScreen> {
             field(_destination, 'Destino (bairro ou campus)', validator: required),
             gap,
             field(_destinationDetail, 'Onde deixa as pessoas', validator: required),
-            gap,
+            const SectionTitle('Saída'),
             Row(
               children: [
                 if (!_recurrent) ...[
@@ -281,7 +285,7 @@ class _OfferScreenState extends State<OfferScreen> {
                     ),
                 ],
               ),
-            gap,
+            const SectionTitle('Vagas e rateio'),
             Row(
               children: [
                 const Expanded(child: Text('Vagas')),
@@ -330,9 +334,21 @@ class _OfferScreenState extends State<OfferScreen> {
               ],
             ),
             gap,
-            Text('Veículo: ${vehicle.model} (${vehicle.plate})'),
-            gap,
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    vehicle.model,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+                PlateBadge(vehicle.plate),
+              ],
+            ),
+            const SizedBox(height: 20),
             FilledButton(
+              style: AppTheme.laneButton,
               onPressed: _saving ? null : _submit,
               child: Text(_saving ? 'Publicando...' : 'Publicar carona'),
             ),
@@ -362,9 +378,13 @@ class _Requirement extends StatelessWidget {
     child: Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Icon(icon, size: 56),
-        const SizedBox(height: 12),
-        Text(text, textAlign: TextAlign.center),
+        Icon(icon, size: 64, color: AppColors.plate),
+        const SizedBox(height: 16),
+        Text(
+          text,
+          textAlign: TextAlign.center,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         const SizedBox(height: 16),
         FilledButton(onPressed: onPressed, child: Text(action)),
       ],

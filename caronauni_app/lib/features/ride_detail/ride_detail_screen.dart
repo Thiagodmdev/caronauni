@@ -3,12 +3,14 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/formatters.dart';
+import '../../core/theme.dart';
 import '../../data/ride_repository.dart';
 import '../../models/models.dart';
 import '../auth/session_controller.dart';
 import '../shared/feedback.dart';
 import '../shared/person_avatar.dart';
 import '../shared/rating_label.dart';
+import '../shared/road.dart';
 import 'ride_detail_view_model.dart';
 import 'ride_map.dart';
 
@@ -73,26 +75,36 @@ class _RideDetailView extends StatelessWidget {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.zero,
         children: [
-          _RouteCard(ride: ride),
-          const SizedBox(height: 12),
-          if (ride.originPoint != null && ride.destinationPoint != null) ...[
-            RideMap(
-              origin: ride.originPoint!,
-              destination: ride.destinationPoint!,
+          _RoutePanel(ride: ride),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (ride.originPoint != null &&
+                    ride.destinationPoint != null) ...[
+                  RideMap(
+                    origin: ride.originPoint!,
+                    destination: ride.destinationPoint!,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                if (viewModel.phone != null) ...[
+                  _ContactCard(phone: viewModel.phone!),
+                  const SizedBox(height: 12),
+                ],
+                _DriverCard(driver: ride.driver),
+                const SizedBox(height: 12),
+                _VehicleCard(vehicle: ride.vehicle),
+                const SizedBox(height: 12),
+                _ReviewsSection(
+                  reviews: viewModel.reputation?.reviews ?? const [],
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-          ],
-          if (viewModel.phone != null) ...[
-            _ContactCard(phone: viewModel.phone!),
-            const SizedBox(height: 12),
-          ],
-          _DriverCard(driver: ride.driver),
-          const SizedBox(height: 12),
-          _VehicleCard(vehicle: ride.vehicle),
-          const SizedBox(height: 12),
-          _ReviewsSection(reviews: viewModel.reputation?.reviews ?? const []),
+          ),
         ],
       ),
       bottomNavigationBar: viewModel.isDriver || ride.cancelled
@@ -102,130 +114,58 @@ class _RideDetailView extends StatelessWidget {
   }
 }
 
-class _RouteCard extends StatelessWidget {
-  const _RouteCard({required this.ride});
+class _RoutePanel extends StatelessWidget {
+  const _RoutePanel({required this.ride});
 
   final Ride ride;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final seats = ride.availableSeats;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '${formatDay(ride.departure, DateTime.now())}, '
-              'às ${formatTime(ride.departure)}',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 16),
-            _RouteStop(
-              icon: Icons.radio_button_checked,
-              time: formatTime(ride.departure),
-              place: ride.origin,
-              detail: ride.originDetail,
-              showLine: true,
-            ),
-            _RouteStop(
-              icon: Icons.location_on,
-              time: formatTime(ride.arrival),
-              place: ride.destination,
-              detail: ride.destinationDetail,
-            ),
-            const Divider(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: _Stat(
-                    label: 'Rateio por pessoa',
-                    value: formatPrice(ride.price),
-                  ),
-                ),
-                Expanded(
-                  child: _Stat(
-                    label: 'Vagas livres',
-                    value: '$seats de ${ride.totalSeats}',
-                  ),
-                ),
-                Expanded(
-                  child: _Stat(
-                    label: 'Duração',
-                    value: '${ride.durationMinutes} min',
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _RouteStop extends StatelessWidget {
-  const _RouteStop({
-    required this.icon,
-    required this.time,
-    required this.place,
-    required this.detail,
-    this.showLine = false,
-  });
-
-  final IconData icon;
-  final String time;
-  final String place;
-  final String detail;
-  final bool showLine;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+    return SignPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 48,
-            child: Text(time, style: theme.textTheme.bodyMedium),
-          ),
-          Column(
-            children: [
-              Icon(icon, size: 20, color: scheme.primary),
-              if (showLine)
-                Expanded(
-                  child: Container(width: 2, color: scheme.outlineVariant),
-                ),
-            ],
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.only(bottom: showLine ? 16 : 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    place,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    detail,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
+          Text(
+            '${formatDay(ride.departure, DateTime.now())}, '
+            'às ${formatTime(ride.departure)}',
+            style: theme.textTheme.headlineMedium?.copyWith(
+              color: Colors.white,
             ),
+          ),
+          const SizedBox(height: 18),
+          RouteStops(
+            from: ride.origin,
+            to: ride.destination,
+            fromDetail: ride.originDetail,
+            toDetail: ride.destinationDetail,
+            fromTime: formatTime(ride.departure),
+            toTime: formatTime(ride.arrival),
+            onDark: true,
+            large: true,
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: _Stat(
+                  label: 'Rateio por pessoa',
+                  value: formatPrice(ride.price),
+                ),
+              ),
+              Expanded(
+                child: _Stat(
+                  label: 'Vagas livres',
+                  value: '${ride.availableSeats} de ${ride.totalSeats}',
+                ),
+              ),
+              Expanded(
+                child: _Stat(
+                  label: 'Duração',
+                  value: '${ride.durationMinutes} min',
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -247,15 +187,12 @@ class _Stat extends StatelessWidget {
       children: [
         Text(
           value,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
-          ),
+          style: theme.textTheme.titleMedium?.copyWith(color: Colors.white),
         ),
-        const SizedBox(height: 2),
         Text(
           label,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
+            color: Colors.white.withValues(alpha: 0.85),
           ),
         ),
       ],
@@ -315,18 +252,18 @@ class _ContactCard extends StatelessWidget {
     final digits = phone.replaceAll(RegExp(r'\D'), '');
     return Card(
       child: ListTile(
-        contentPadding: const EdgeInsets.only(left: 16, right: 4),
-        title: Text(phone),
+        contentPadding: const EdgeInsets.only(left: 16, right: 8),
+        title: Text(phone, style: Theme.of(context).textTheme.titleMedium),
         subtitle: const Text('Combine o encontro'),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            IconButton(
+            IconButton.filledTonal(
               tooltip: 'Ligar',
               onPressed: () => launchUrl(Uri.parse('tel:+55$digits')),
               icon: const Icon(Icons.phone_outlined),
             ),
-            IconButton(
+            IconButton.filledTonal(
               tooltip: 'WhatsApp',
               onPressed: () => launchUrl(
                 Uri.parse('https://wa.me/55$digits'),
@@ -348,13 +285,30 @@ class _VehicleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
     return Card(
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-        leading: Icon(Icons.directions_car_outlined, color: scheme.primary),
-        title: Text('${vehicle.model} ${vehicle.color.toLowerCase()}'),
-        subtitle: Text('Placa ${vehicle.plate}'),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(vehicle.model, style: theme.textTheme.titleMedium),
+                  Text(
+                    'Cor: ${vehicle.color.toLowerCase()}',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppColors.muted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            PlateBadge(vehicle.plate),
+          ],
+        ),
       ),
     );
   }
@@ -405,7 +359,7 @@ class _ReviewsSection extends StatelessWidget {
                             Icon(
                               Icons.star_rounded,
                               size: 14,
-                              color: Colors.amber.shade700,
+                              color: const Color(0xFFE09B00),
                             ),
                         ],
                       ),
@@ -473,14 +427,20 @@ class _RequestBar extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: scheme.primaryContainer,
+                  color: viewModel.status == RequestStatus.accepted
+                      ? AppColors.goSoft
+                      : AppColors.laneSoft,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      Icons.hourglass_top_rounded,
-                      color: scheme.onPrimaryContainer,
+                      viewModel.status == RequestStatus.accepted
+                          ? Icons.check_circle_rounded
+                          : Icons.hourglass_top_rounded,
+                      color: viewModel.status == RequestStatus.accepted
+                          ? AppColors.go
+                          : AppColors.ink,
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -490,9 +450,7 @@ class _RequestBar extends StatelessWidget {
                             : 'Pedido enviado. Aguardando a resposta de quem '
                                   'dirige. O telefone aparece depois da '
                                   'aceitação.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: scheme.onPrimaryContainer,
-                        ),
+                        style: theme.textTheme.bodyMedium,
                       ),
                     ),
                   ],
@@ -518,10 +476,11 @@ class _RequestBar extends StatelessWidget {
                 const SizedBox(height: 8),
               ],
               FilledButton.icon(
+                style: AppTheme.laneButton,
                 onPressed: viewModel.busy
                     ? null
                     : () => _confirmRequest(context),
-                icon: const Icon(Icons.front_hand_outlined),
+                icon: const Icon(Icons.event_seat_rounded),
                 label: const Text('Pedir vaga'),
               ),
             ],

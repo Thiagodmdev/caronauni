@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/formatters.dart';
+import '../../core/theme.dart';
 import '../../data/ride_repository.dart';
 import '../../models/models.dart';
 import '../auth/session_controller.dart';
@@ -44,16 +45,21 @@ class NoticesScreen extends StatelessWidget {
           return [
             for (final ride in soon)
               Card(
+                color: AppColors.lane,
                 child: ListTile(
-                  leading: const Icon(Icons.alarm),
+                  leading: const Icon(Icons.alarm, color: AppColors.ink),
                   title: Text('Sua carona sai às ${formatTime(ride.departure)}'),
-                  subtitle: Text('${ride.origin} → ${ride.destination}'),
+                  subtitle: Text(
+                    'De ${ride.origin} para ${ride.destination}',
+                    style: const TextStyle(color: AppColors.ink),
+                  ),
                 ),
               ),
             if (notices.isEmpty && soon.isEmpty)
               const EmptyText('Nenhum aviso por enquanto.'),
             for (final notice in notices)
               ListTile(
+                contentPadding: const EdgeInsets.symmetric(vertical: 2),
                 leading: Icon(
                   notice.read
                       ? Icons.notifications_none
